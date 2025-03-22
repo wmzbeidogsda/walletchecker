@@ -134,7 +134,7 @@
             <button onclick="startAnalysis()">开始分析</button>
         </div>
 
-        <textarea id="addresses" placeholder="输入钱包地址，每行一个（示例：0xA6A2e8FbA7d3e34357E3D460aC3B6C460aC8f2）"></textarea>
+        <textarea id="addresses" placeholder="输入钱包地址，每行一个"></textarea>
 
         <div class="stats-bar" id="globalStats">
             <div class="stat-item">
@@ -176,27 +176,29 @@
             return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
         }
 
-        // 代币数据解析
+        // 强化代币数据解析
         function parseTokenData(data) {
             const MON = data?.result?.data?.find(t => 
-                t.contractAddress === '0x0000000000000000000000000000000000000000')?.balance || '0';
-            const aprMON = data?.result?.data?.find(t => 
-                t.contractAddress === '0xb2f82D0f38dc453D596Ad40A37799446Cc89274A')?.balance || '0';
+                t.contractAddress?.toLowerCase() === '0x0000000000000000000000000000000000000000')?.balance || '0';
             
+            // 修复aprMON查询逻辑
+            const aprMON = data?.result?.data?.find(t => 
+                t.contractAddress?.toLowerCase() === '0xb2f82d0f38dc453d596ad40a37799446cc89274a')?.balance || '0';
+
             return {
                 MON: Number(MON).toFixed(4),
                 aprMON: Number(aprMON).toFixed(4)
             }
         }
 
-        // 分页获取所有交易记录
+        // 强化分页请求
         async function fetchAllTransactions(address, apiKey) {
             let allTransactions = [];
             let cursor = '';
             let hasMore = true;
-            let attempts = 0;
+            let retries = 0;
 
-            while (hasMore && attempts < 10) { // 防止无限循环
+            while (hasMore && retries < 5) {
                 try {
                     const url = new URL(API_CONFIG.transactions);
                     url.searchParams.set('address', address);
@@ -212,37 +214,46 @@
                     const data = await response.json();
                     if (data.code !== 0) break;
 
+                    // 合并数据并更新cursor
                     allTransactions = [...allTransactions, ...(data.result?.data || [])];
-                    cursor = data.result?.cursor || '';
-                    hasMore = !!cursor && cursor !== 'null';
-                    attempts = 0; // 成功请求后重置计数器
+                    const newCursor = data.result?.cursor;
+
+                    // 终止条件检测
+                    if (!newCursor || newCursor === cursor || newCursor === 'null') {
+                        hasMore = false;
+                    } else {
+                        cursor = newCursor;
+                    }
+                    retries = 0; // 成功请求后重置重试次数
                 } catch (error) {
                     console.error(`分页请求失败: ${error.message}`);
-                    if (++attempts >= 3) break; // 最多重试3次
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+                    if (++retries >= 3) break;
+                    await new Promise(resolve => setTimeout(resolve, 1000 * retries));
                 }
             }
             return allTransactions;
         }
 
-        // 处理交易数据
+        // 强化交易处理
         async function processTransactions(address, apiKey) {
             try {
                 const allTransactions = await fetchAllTransactions(address, apiKey);
                 const contracts = new Set();
 
+                // 深度解析交易记录
                 allTransactions.forEach(tx => {
-                    // 收集所有合约地址
-                    if (tx.toAddress?.isContract) {
+                    // 处理to地址
+                    if (tx.toAddress?.address && tx.toAddress.isContract) {
                         contracts.add(tx.toAddress.address.toLowerCase());
                     }
+                    // 处理合约创建交易
                     if (tx.contractAddress) {
                         contracts.add(tx.contractAddress.toLowerCase());
                     }
                 });
 
                 return {
-                    total: allTransactions.length,
+                    total: allTransactions.length, // 实际交易总数
                     contracts: contracts.size
                 };
             } catch (error) {
