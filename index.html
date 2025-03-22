@@ -171,17 +171,14 @@
             internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
         };
 
-        // 地址缩短显示
         function shortenAddress(address) {
             return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
         }
 
-        // 强化代币数据解析
         function parseTokenData(data) {
             const MON = data?.result?.data?.find(t => 
                 t.contractAddress?.toLowerCase() === '0x0000000000000000000000000000000000000000')?.balance || '0';
             
-            // 修复aprMON查询逻辑
             const aprMON = data?.result?.data?.find(t => 
                 t.contractAddress?.toLowerCase() === '0xb2f82d0f38dc453d596ad40a37799446cc89274a')?.balance || '0';
 
@@ -191,15 +188,17 @@
             }
         }
 
-        // 强化分页请求
-        async function fetchAllTransactions(address, apiKey) {
-            let allTransactions = [];
+        // 强化分页请求逻辑
+        async function fetchAllContracts(address, apiKey) {
             let cursor = '';
-            let hasMore = true;
-            let retries = 0;
+            let contractSet = new Set();
+            let totalTxCount = 0;
+            let activitiesCount = 0;
+            let internalTxCount = 0;
+            const MAX_PAGES = 20;
 
-            while (hasMore && retries < 5) {
-                try {
+            try {
+                for (let page = 0; page < MAX_PAGES; page++) {
                     const url = new URL(API_CONFIG.transactions);
                     url.searchParams.set('address', address);
                     url.searchParams.set('cursor', cursor);
@@ -208,89 +207,63 @@
                     const response = await fetch(url, {
                         headers: { 'x-api-key': apiKey }
                     });
-
-                    if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
-
+                    
                     const data = await response.json();
-                    if (data.code !== 0) break;
+                    if (data.code !== 0 || !data.result) break;
 
-                    // 合并数据并更新cursor
-                    allTransactions = [...allTransactions, ...(data.result?.data || [])];
-                    const newCursor = data.result?.cursor;
+                    // 首次获取总交易数
+                    if (page === 0) totalTxCount = data.result.total;
 
-                    // 终止条件检测
-                    if (!newCursor || newCursor === cursor || newCursor === 'null') {
-                        hasMore = false;
-                    } else {
-                        cursor = newCursor;
-                    }
-                    retries = 0; // 成功请求后重置重试次数
-                } catch (error) {
-                    console.error(`分页请求失败: ${error.message}`);
-                    if (++retries >= 3) break;
-                    await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+                    // 收集合约地址
+                    data.result.data?.forEach(tx => {
+                        if (tx.toAddress?.isContract) {
+                            contractSet.add(tx.toAddress.address.toLowerCase());
+                        }
+                        if (tx.contractAddress) {
+                            contractSet.add(tx.contractAddress.toLowerCase());
+                        }
+                    });
+
+                    // 更新分页cursor
+                    cursor = data.result.nextPageCursor;
+                    if (!cursor || cursor === 'null') break;
                 }
-            }
-            return allTransactions;
-        }
 
-        // 强化交易处理
-        async function processTransactions(address, apiKey) {
-            try {
-                const allTransactions = await fetchAllTransactions(address, apiKey);
-                const contracts = new Set();
-
-                // 深度解析交易记录
-                allTransactions.forEach(tx => {
-                    // 处理to地址
-                    if (tx.toAddress?.address && tx.toAddress.isContract) {
-                        contracts.add(tx.toAddress.address.toLowerCase());
-                    }
-                    // 处理合约创建交易
-                    if (tx.contractAddress) {
-                        contracts.add(tx.contractAddress.toLowerCase());
-                    }
-                });
+                // 获取活动和内部交易
+                const [activities, internal] = await Promise.all([
+                    fetchData(API_CONFIG.activities, address, apiKey),
+                    fetchData(API_CONFIG.internal, address, apiKey)
+                ]);
 
                 return {
-                    total: allTransactions.length, // 实际交易总数
-                    contracts: contracts.size
+                    total: totalTxCount,
+                    contracts: contractSet.size,
+                    activities: activities?.result?.total || 0,
+                    internal: internal?.result?.total || 0
                 };
             } catch (error) {
-                console.error('交易处理失败:', error);
-                return { total: 0, contracts: 0 };
+                console.error('分页请求失败:', error);
+                return { total: 0, contracts: 0, activities: 0, internal: 0 };
             }
         }
 
-        // 通用API请求
         async function fetchData(endpoint, address, apiKey) {
             try {
                 const response = await fetch(`${endpoint}?address=${address}`, {
                     headers: { 'x-api-key': apiKey }
                 });
-                
-                if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
-                const data = await response.json();
-                
-                if (data.code !== 0) {
-                    throw new Error(data.message || 'API返回错误');
-                }
-                
-                return data;
+                return await response.json();
             } catch (error) {
                 console.error(`请求失败: ${error.message}`);
                 return null;
             }
         }
 
-        // 地址分析主函数
         async function analyzeAddress(address, apiKey) {
             try {
-                const [tokens, activities, internal, txResult] = await Promise.all([
+                const [tokens, txData] = await Promise.all([
                     fetchData(API_CONFIG.tokens, address, apiKey),
-                    fetchData(API_CONFIG.activities, address, apiKey),
-                    fetchData(API_CONFIG.internal, address, apiKey),
-                    processTransactions(address, apiKey)
+                    fetchAllContracts(address, apiKey)
                 ]);
 
                 const balances = parseTokenData(tokens || {});
@@ -299,10 +272,10 @@
                     address,
                     MON: balances.MON,
                     aprMON: balances.aprMON,
-                    transactions: txResult.total,
-                    activities: activities?.result?.total || 0,
-                    internal: internal?.result?.total || 0,
-                    contracts: txResult.contracts
+                    transactions: txData.total,
+                    activities: txData.activities,
+                    internal: txData.internal,
+                    contracts: txData.contracts
                 };
             } catch (error) {
                 console.error(`地址分析失败: ${address}`, error);
@@ -318,7 +291,6 @@
             }
         }
 
-        // 更新界面
         function updateUI(results) {
             const tbody = document.getElementById('resultBody');
             tbody.innerHTML = results.map(result => `
@@ -341,7 +313,6 @@
             document.getElementById('totalAprMON').textContent = totalAprMON.toFixed(4);
         }
 
-        // 启动分析
         async function startAnalysis() {
             const apiKey = document.getElementById('apiKey').value.trim();
             const addresses = document.getElementById('addresses').value
