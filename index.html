@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monad 钱包分析工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 20px;
+            background-color: #f5f6fa;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #2d3436;
+            font-weight: 500;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #dcdde1;
+            border-radius: 6px;
+            min-height: 120px;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            background: #0984e3;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #0873c4;
+        }
+
+        .result-box {
+            margin-top: 2rem;
+            border-top: 1px solid #eee;
+            padding-top: 1.5rem;
+        }
+
+        .address-result {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: #f1f2f6;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Monad 钱包分析</h1>
+        <div class="input-group">
+            <label>API Key:</label>
+            <input type="text" id="apiKey" placeholder="输入您的API Key" style="width: 300px;">
+        </div>
+        <div class="input-group">
+            <label>钱包地址 (每行一个):</label>
+            <textarea id="addresses"></textarea>
+            <button onclick="startAnalysis()">开始分析</button>
+        </div>
+        <div id="results" class="result-box"></div>
+    </div>
+
+    <script>
+        const API_CONFIG = {
+            tokens: 'https://api.blockvision.org/v2/monad/account/tokens',
+            transactions: 'https://api.blockvision.org/v2/monad/account/transactions',
+            activities: 'https://api.blockvision.org/v2/monad/account/activities',
+            internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
+        };
+
+        async function fetchData(url, address) {
+            const response = await fetch(`${url}?address=${address}`, {
+                headers: {
+                    'x-api-key': document.getElementById('apiKey').value
+                }
+            });
+            return response.json();
+        }
+
+        function processTokens(data) {
+            const targetTokens = {
+                '0x0000000000000000000000000000000000000000': 'MON',
+                '0xb2f82D0f38dc453D596Ad40A37799446Cc89274A': 'aprMON'
+            };
+
+            return Object.entries(targetTokens).map(([contract, name]) => {
+                const token = data.tokens.find(t => t.contractAddress === contract);
+                return {
+                    name,
+                    balance: token ? token.balance : '0'
+                };
+            });
+        }
+
+        function processTransactions(data) {
+            const contracts = new Set(data.data.map(tx => tx.contractAddress));
+            return {
+                total: data.total,
+                uniqueContracts: contracts.size
+            };
+        }
+
+        async function analyzeAddress(address) {
+            try {
+                const [tokens, transactions, activities, internal] = await Promise.all([
+                    fetchData(API_CONFIG.tokens, address),
+                    fetchData(API_CONFIG.transactions, address),
+                    fetchData(API_CONFIG.activities, address),
+                    fetchData(API_CONFIG.internal, address)
+                ]);
+
+                return {
+                    address,
+                    tokens: processTokens(tokens),
+                    transactions: processTransactions(transactions),
+                    activities: activities.total,
+                    internal: internal.total
+                };
+            } catch (error) {
+                console.error(`Error analyzing ${address}:`, error);
+                return null;
+            }
+        }
+
+        function renderResult(result) {
+            const container = document.createElement('div');
+            container.className = 'address-result';
+            
+            container.innerHTML = `
+                <h3>地址: ${result.address}</h3>
+                <div class="metric-item">
+                    <span>代币余额:</span>
+                    <div>
+                        ${result.tokens.map(t => `${t.name}: ${t.balance}`).join(' | ')}
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <span>交易数量:</span>
+                    <span>${result.transactions.total}</span>
+                </div>
+                <div class="metric-item">
+                    <span>活动数量:</span>
+                    <span>${result.activities}</span>
+                </div>
+                <div class="metric-item">
+                    <span>内部交易:</span>
+                    <span>${result.internal}</span>
+                </div>
+                <div class="metric-item" style="background: #e3f2fd;">
+                    <span>交互合约数量:</span>
+                    <span>${result.transactions.uniqueContracts}</span>
+                </div>
+            `;
+            
+            return container;
+        }
+
+        async function startAnalysis() {
+            const addresses = document.getElementById('addresses').value
+                .split('\n')
+                .map(a => a.trim())
+                .filter(a => a);
+
+            const resultsContainer = document.getElementById('results');
+            resultsContainer.innerHTML = '<div>分析中...</div>';
+
+            const results = await Promise.all(addresses.map(analyzeAddress));
+            
+            resultsContainer.innerHTML = '';
+            results.forEach(result => {
+                if (result) resultsContainer.appendChild(renderResult(result));
+            });
+        }
+    </script>
+</body>
+</html>
