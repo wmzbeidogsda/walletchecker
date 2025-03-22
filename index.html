@@ -110,7 +110,7 @@
             <button onclick="startAnalysis()">开始分析</button>
         </div>
 
-        <textarea id="addresses" placeholder="输入钱包地址，每行一个"></textarea>
+        <textarea id="addresses" placeholder="输入钱包地址，每行一个">0xA6A2e8FbA7d3e34357E3D460aC3B6C460aC8f2</textarea>
 
         <table class="address-table">
             <thead>
@@ -125,9 +125,7 @@
                 </tr>
             </thead>
             <tbody id="resultBody">
-                <tr class="loading">
-                    <td colspan="7">等待查询...</td>
-                </tr>
+                <!-- 动态内容将在此处插入 -->
             </tbody>
         </table>
     </div>
@@ -140,10 +138,12 @@
             internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
         };
 
+        // 地址缩短显示
         function shortenAddress(address) {
             return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
         }
 
+        // API请求封装
         async function fetchData(endpoint, address) {
             try {
                 const response = await fetch(`${endpoint}?address=${address}`, {
@@ -153,22 +153,36 @@
                 });
                 
                 if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
-                return await response.json();
+                const data = await response.json();
+                
+                // 检查API业务状态码
+                if (data.code !== 0) {
+                    throw new Error(data.message || 'API返回错误');
+                }
+                
+                return data;
             } catch (error) {
                 console.error(`请求失败: ${error.message}`);
                 return null;
             }
         }
 
+        // 代币余额解析
         function parseTokenBalance(data, contractAddress) {
-            const token = data?.tokens?.find(t => t.contractAddress === contractAddress);
+            if (!data?.tokens) return '0.0000';
+            const token = data.tokens.find(t => t.contractAddress === contractAddress);
             return token ? Number(token.balance).toFixed(4) : '0.0000';
         }
 
-        function countUniqueContracts(data) {
-            return new Set(data?.data?.map(tx => tx.contractAddress)).size || 0;
+        // 处理交易数据
+        function processTransactions(data) {
+            return {
+                total: data?.total || 0,
+                contracts: new Set(data?.data?.map(tx => tx.contractAddress)).size || 0
+            };
         }
 
+        // 地址分析主函数
         async function analyzeAddress(address) {
             try {
                 const [tokens, tx, activities, internal] = await Promise.all([
@@ -178,21 +192,35 @@
                     fetchData(API_CONFIG.internal, address)
                 ]);
 
+                // 确保所有请求都成功
+                if (!tokens || !tx || !activities || !internal) {
+                    throw new Error('部分请求失败');
+                }
+
                 return {
                     address,
                     MON: parseTokenBalance(tokens, '0x0000000000000000000000000000000000000000'),
                     aprMON: parseTokenBalance(tokens, '0xb2f82D0f38dc453D596Ad40A37799446Cc89274A'),
-                    transactions: tx?.total || 0,
-                    activities: activities?.total || 0,
-                    internal: internal?.total || 0,
-                    contracts: countUniqueContracts(tx)
+                    transactions: tx.total,
+                    activities: activities.total,
+                    internal: internal.total,
+                    contracts: processTransactions(tx).contracts
                 };
             } catch (error) {
                 console.error(`地址分析失败: ${address}`, error);
-                return null;
+                return {
+                    address,
+                    MON: '0.0000',
+                    aprMON: '0.0000',
+                    transactions: 0,
+                    activities: 0,
+                    internal: 0,
+                    contracts: 0
+                };
             }
         }
 
+        // 更新界面
         function updateUI(results) {
             const tbody = document.getElementById('resultBody');
             tbody.innerHTML = results.map(result => `
@@ -205,26 +233,30 @@
                     <td class="numeric">${result.internal}</td>
                     <td class="numeric">${result.contracts}</td>
                 </tr>
-            `).join('') || '<tr><td colspan="7">无有效数据</td></tr>';
+            `).join('');
         }
 
+        // 启动分析
         async function startAnalysis() {
             const addresses = document.getElementById('addresses').value
                 .split('\n')
                 .map(a => a.trim())
                 .filter(a => a.startsWith('0x') && a.length === 42);
 
-            if (!addresses.length) return alert('请输入有效的钱包地址');
+            if (!addresses.length) {
+                alert('请输入有效的钱包地址');
+                return;
+            }
 
             const tbody = document.getElementById('resultBody');
-            tbody.innerHTML = '<tr class="loading"><td colspan="7">分析中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">分析中...</td></tr>';
 
             try {
                 const results = await Promise.all(addresses.map(analyzeAddress));
-                updateUI(results.filter(Boolean));
+                updateUI(results);
             } catch (error) {
                 console.error('分析流程失败:', error);
-                tbody.innerHTML = '<tr><td colspan="7">分析失败，请检查控制台</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7">分析失败: ' + error.message + '</td></tr>';
             }
         }
     </script>
