@@ -3,93 +3,189 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monad 钱包分析工具</title>
+    <title>Blockchain Analytics Dashboard</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1000px;
-            margin: 2rem auto;
-            padding: 0 20px;
-            background-color: #f5f6fa;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
         }
 
-        .container {
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 15px 30px;
+            background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .header img {
+            height: 32px;
+            margin-right: 25px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 25px;
+        }
+
+        .nav-links a {
+            color: #4a4a4a;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: #2563eb;
+        }
+
+        .toolbar {
+            margin-left: auto;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .api-key-input {
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            width: 220px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #2563eb;
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #e0e0e0;
+            color: #4a4a4a;
+        }
+
+        .content {
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .address-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin: 20px 0;
+            min-height: 100px;
+            font-family: monospace;
+        }
+
+        .analytics-table {
+            width: 100%;
+            border-collapse: collapse;
             background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        .input-group {
-            margin-bottom: 1.5rem;
+        .analytics-table th,
+        .analytics-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
         }
 
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #2d3436;
+        .analytics-table th {
+            background-color: #f8fafc;
+            color: #64748b;
             font-weight: 500;
         }
 
-        textarea {
-            width: 100%;
-            padding: 0.8rem;
-            border: 1px solid #dcdde1;
-            border-radius: 6px;
-            min-height: 120px;
-            margin-bottom: 1rem;
+        .metric-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
         }
 
-        button {
-            background: #0984e3;
-            color: white;
-            border: none;
-            padding: 0.8rem 1.5rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.3s;
+        .bg-blue {
+            background-color: #dbeafe;
+            color: #1e40af;
         }
 
-        button:hover {
-            background: #0873c4;
-        }
-
-        .result-box {
-            margin-top: 2rem;
-            border-top: 1px solid #eee;
-            padding-top: 1.5rem;
-        }
-
-        .address-result {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .metric-item {
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
             display: flex;
-            justify-content: space-between;
-            margin: 0.5rem 0;
-            padding: 0.5rem;
-            background: #f1f2f6;
-            border-radius: 6px;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            color: #64748b;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Monad 钱包分析</h1>
-        <div class="input-group">
-            <label>API Key:</label>
-            <input type="text" id="apiKey" placeholder="输入您的API Key" style="width: 300px;">
+    <div class="header">
+        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMjU2M2ViIj48cGF0aCBkPSJNMTIgMEwzIDRsMi4yMSA3LjI0TDcgMTRsNSAxNCA1LTE0LTEuNzktMi43NkwyMSA0IDEyIDB6bS0uMTggNS43NmwuODUgMi43N2guODFsMi4wNyAxLjM0LTIuMTggLjY4LS44NCAyLjc2LTEuNTUtMi4xMi0yLjg4LS4yMyAxLjkzLTEuNjQtLjk4LTIuOTQgMS4zOSAyLjA0eiIvPjwvc3ZnPg==" alt="Logo">
+        <nav class="nav-links">
+            <a href="#">Dashboard</a>
+            <a href="#">Address Analysis</a>
+            <a href="#">Transaction Monitor</a>
+        </nav>
+        <div class="toolbar">
+            <input type="text" 
+                   class="api-key-input" 
+                   placeholder="API Key"
+                   id="apiKey"
+                   value="2u4VqFS9aYirT71pfdfcOglxVd81">
+            <button class="btn btn-secondary" onclick="toggleAddressInput()">Manage Addresses</button>
         </div>
-        <div class="input-group">
-            <label>钱包地址 (每行一个):</label>
-            <textarea id="addresses"></textarea>
-            <button onclick="startAnalysis()">开始分析</button>
+    </div>
+
+    <div class="content">
+        <div id="inputSection" style="display: none;">
+            <h2>Address Analysis</h2>
+            <textarea class="address-input" 
+                      id="addresses"
+                      placeholder="Enter wallet addresses (one per line)"></textarea>
+            <button class="btn btn-primary" onclick="startAnalysis()">Start Analysis</button>
         </div>
-        <div id="results" class="result-box"></div>
+
+        <div id="results">
+            <table class="analytics-table">
+                <thead>
+                    <tr>
+                        <th>Address</th>
+                        <th>MON Balance</th>
+                        <th>aprMON Balance</th>
+                        <th>Transactions</th>
+                        <th>Activities</th>
+                        <th>Internal Txns</th>
+                        <th>Unique Contracts</th>
+                    </tr>
+                </thead>
+                <tbody id="resultBody"></tbody>
+            </table>
+        </div>
+
+        <div id="loading" class="loading-overlay" style="display: none;">
+            Analyzing addresses...
+        </div>
     </div>
 
     <script>
@@ -100,108 +196,103 @@
             internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
         };
 
-        async function fetchData(url, address) {
-            const response = await fetch(`${url}?address=${address}`, {
-                headers: {
-                    'x-api-key': document.getElementById('apiKey').value
-                }
-            });
-            return response.json();
+        function toggleAddressInput() {
+            const section = document.getElementById('inputSection');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
         }
 
-        function processTokens(data) {
-            const targetTokens = {
+        async function fetchData(url, address) {
+            try {
+                const response = await fetch(`${url}?address=${address}`, {
+                    headers: {
+                        'x-api-key': document.getElementById('apiKey').value.trim()
+                    }
+                });
+                
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Request failed: ${error.message}`);
+                return null;
+            }
+        }
+
+        function parseTokens(data) {
+            const targets = {
                 '0x0000000000000000000000000000000000000000': 'MON',
                 '0xb2f82D0f38dc453D596Ad40A37799446Cc89274A': 'aprMON'
             };
 
-            return Object.entries(targetTokens).map(([contract, name]) => {
-                const token = data.tokens.find(t => t.contractAddress === contract);
-                return {
-                    name,
-                    balance: token ? token.balance : '0'
-                };
-            });
+            return Object.entries(targets).reduce((acc, [addr, name]) => {
+                const token = data?.tokens?.find(t => t.contractAddress === addr);
+                acc[name] = token ? Number(token.balance).toFixed(4) : '0.0000';
+                return acc;
+            }, {});
         }
 
         function processTransactions(data) {
-            const contracts = new Set(data.data.map(tx => tx.contractAddress));
+            const contracts = new Set(data?.data?.map(tx => tx.contractAddress));
             return {
-                total: data.total,
+                total: data?.total || 0,
                 uniqueContracts: contracts.size
             };
         }
 
         async function analyzeAddress(address) {
-            try {
-                const [tokens, transactions, activities, internal] = await Promise.all([
-                    fetchData(API_CONFIG.tokens, address),
-                    fetchData(API_CONFIG.transactions, address),
-                    fetchData(API_CONFIG.activities, address),
-                    fetchData(API_CONFIG.internal, address)
-                ]);
+            const [tokens, tx, activities, internal] = await Promise.all([
+                fetchData(API_CONFIG.tokens, address),
+                fetchData(API_CONFIG.transactions, address),
+                fetchData(API_CONFIG.activities, address),
+                fetchData(API_CONFIG.internal, address)
+            ]);
 
-                return {
-                    address,
-                    tokens: processTokens(tokens),
-                    transactions: processTransactions(transactions),
-                    activities: activities.total,
-                    internal: internal.total
-                };
-            } catch (error) {
-                console.error(`Error analyzing ${address}:`, error);
-                return null;
-            }
+            return {
+                address,
+                tokens: parseTokens(tokens || {}),
+                transactions: processTransactions(tx || {}),
+                activities: activities?.total || 0,
+                internal: internal?.total || 0
+            };
         }
 
-        function renderResult(result) {
-            const container = document.createElement('div');
-            container.className = 'address-result';
-            
-            container.innerHTML = `
-                <h3>地址: ${result.address}</h3>
-                <div class="metric-item">
-                    <span>代币余额:</span>
-                    <div>
-                        ${result.tokens.map(t => `${t.name}: ${t.balance}`).join(' | ')}
-                    </div>
-                </div>
-                <div class="metric-item">
-                    <span>交易数量:</span>
-                    <span>${result.transactions.total}</span>
-                </div>
-                <div class="metric-item">
-                    <span>活动数量:</span>
-                    <span>${result.activities}</span>
-                </div>
-                <div class="metric-item">
-                    <span>内部交易:</span>
-                    <span>${result.internal}</span>
-                </div>
-                <div class="metric-item" style="background: #e3f2fd;">
-                    <span>交互合约数量:</span>
-                    <span>${result.transactions.uniqueContracts}</span>
-                </div>
-            `;
-            
-            return container;
+        function renderResults(results) {
+            const tbody = document.getElementById('resultBody');
+            tbody.innerHTML = results.map(result => `
+                <tr>
+                    <td>${result.address}</td>
+                    <td>${result.tokens.MON}</td>
+                    <td>${result.tokens.aprMON}</td>
+                    <td>${result.transactions.total}</td>
+                    <td>${result.activities}</td>
+                    <td>${result.internal}</td>
+                    <td><span class="metric-badge bg-blue">${result.transactions.uniqueContracts}</span></td>
+                </tr>
+            `).join('');
         }
 
         async function startAnalysis() {
             const addresses = document.getElementById('addresses').value
                 .split('\n')
                 .map(a => a.trim())
-                .filter(a => a);
+                .filter(a => a.startsWith('0x') && a.length === 42);
 
-            const resultsContainer = document.getElementById('results');
-            resultsContainer.innerHTML = '<div>分析中...</div>';
+            if (!addresses.length) return alert('Please enter valid addresses');
 
-            const results = await Promise.all(addresses.map(analyzeAddress));
-            
-            resultsContainer.innerHTML = '';
-            results.forEach(result => {
-                if (result) resultsContainer.appendChild(renderResult(result));
-            });
+            const loading = document.getElementById('loading');
+            loading.style.display = 'flex';
+
+            try {
+                const results = await Promise.all(
+                    addresses.map(addr => analyzeAddress(addr))
+                );
+                
+                renderResults(results.filter(Boolean));
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                alert('Analysis failed - check console');
+            } finally {
+                loading.style.display = 'none';
+            }
         }
     </script>
 </body>
