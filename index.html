@@ -21,7 +21,7 @@
             max-width: 1200px;
             margin: 0 auto;
             background: white;
-            border-radius: 12-box;
+            border-radius: 12px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
             padding: 2rem;
         }
@@ -159,9 +159,7 @@
                     <th>交互合约</th>
                 </tr>
             </thead>
-            <tbody id="resultBody">
-                <!-- 动态内容将在此处插入 -->
-            </tbody>
+            <tbody id="resultBody"></tbody>
         </table>
     </div>
 
@@ -191,27 +189,40 @@
             }
         }
 
-        // 分页获取交易数据
+        // 分页获取所有交易记录
         async function fetchAllTransactions(address, apiKey) {
-            let allData = [];
+            let allTransactions = [];
             let cursor = '';
             let hasMore = true;
+            let attempts = 0;
 
-            while (hasMore) {
-                const response = await fetch(`${API_CONFIG.transactions}?address=${address}&cursor=${cursor}&limit=50`, {
-                    headers: { 'x-api-key': apiKey }
-                });
-                
-                if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
-                const data = await response.json();
-                
-                if (data.code !== 0) break;
+            while (hasMore && attempts < 10) { // 防止无限循环
+                try {
+                    const url = new URL(API_CONFIG.transactions);
+                    url.searchParams.set('address', address);
+                    url.searchParams.set('cursor', cursor);
+                    url.searchParams.set('limit', '50');
 
-                allData = [...allData, ...(data.result?.data || [])];
-                cursor = data.result?.cursor || '';
-                hasMore = !!cursor && cursor !== 'null';
+                    const response = await fetch(url, {
+                        headers: { 'x-api-key': apiKey }
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.code !== 0) break;
+
+                    allTransactions = [...allTransactions, ...(data.result?.data || [])];
+                    cursor = data.result?.cursor || '';
+                    hasMore = !!cursor && cursor !== 'null';
+                    attempts = 0; // 成功请求后重置计数器
+                } catch (error) {
+                    console.error(`分页请求失败: ${error.message}`);
+                    if (++attempts >= 3) break; // 最多重试3次
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+                }
             }
-            return allData;
+            return allTransactions;
         }
 
         // 处理交易数据
@@ -221,8 +232,12 @@
                 const contracts = new Set();
 
                 allTransactions.forEach(tx => {
-                    if (tx.toAddress?.address && tx.toAddress.isContract) {
+                    // 收集所有合约地址
+                    if (tx.toAddress?.isContract) {
                         contracts.add(tx.toAddress.address.toLowerCase());
+                    }
+                    if (tx.contractAddress) {
+                        contracts.add(tx.contractAddress.toLowerCase());
                     }
                 });
 
