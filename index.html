@@ -21,7 +21,7 @@
             max-width: 1200px;
             margin: 0 auto;
             background: white;
-            border-radius: 12px;
+            border-radius: 12-box;
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
             padding: 2rem;
         }
@@ -145,10 +145,6 @@
                 <span class="stat-label">总 aprMON:</span>
                 <span class="stat-value" id="totalAprMON">0.0000</span>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">交互合约数:</span>
-                <span class="stat-value" id="totalContracts">0</span>
-            </div>
         </div>
 
         <table class="address-table">
@@ -160,6 +156,7 @@
                     <th>交易数量</th>
                     <th>活动记录</th>
                     <th>内部交易</th>
+                    <th>交互合约</th>
                 </tr>
             </thead>
             <tbody id="resultBody">
@@ -194,7 +191,52 @@
             }
         }
 
-        // API请求封装
+        // 分页获取交易数据
+        async function fetchAllTransactions(address, apiKey) {
+            let allData = [];
+            let cursor = '';
+            let hasMore = true;
+
+            while (hasMore) {
+                const response = await fetch(`${API_CONFIG.transactions}?address=${address}&cursor=${cursor}&limit=50`, {
+                    headers: { 'x-api-key': apiKey }
+                });
+                
+                if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
+                const data = await response.json();
+                
+                if (data.code !== 0) break;
+
+                allData = [...allData, ...(data.result?.data || [])];
+                cursor = data.result?.cursor || '';
+                hasMore = !!cursor && cursor !== 'null';
+            }
+            return allData;
+        }
+
+        // 处理交易数据
+        async function processTransactions(address, apiKey) {
+            try {
+                const allTransactions = await fetchAllTransactions(address, apiKey);
+                const contracts = new Set();
+
+                allTransactions.forEach(tx => {
+                    if (tx.toAddress?.address && tx.toAddress.isContract) {
+                        contracts.add(tx.toAddress.address.toLowerCase());
+                    }
+                });
+
+                return {
+                    total: allTransactions.length,
+                    contracts: contracts.size
+                };
+            } catch (error) {
+                console.error('交易处理失败:', error);
+                return { total: 0, contracts: 0 };
+            }
+        }
+
+        // 通用API请求
         async function fetchData(endpoint, address, apiKey) {
             try {
                 const response = await fetch(`${endpoint}?address=${address}`, {
@@ -215,41 +257,26 @@
             }
         }
 
-        // 处理交易数据获取合约地址
-        function processTransactions(data) {
-            const contracts = new Set();
-            data?.result?.data?.forEach(tx => {
-                if (tx.toAddress?.address) {
-                    contracts.add(tx.toAddress.address.toLowerCase());
-                }
-            });
-            return {
-                total: data?.result?.total || 0,
-                contracts: contracts.size
-            };
-        }
-
         // 地址分析主函数
         async function analyzeAddress(address, apiKey) {
             try {
-                const [tokens, tx, activities, internal] = await Promise.all([
+                const [tokens, activities, internal, txResult] = await Promise.all([
                     fetchData(API_CONFIG.tokens, address, apiKey),
-                    fetchData(API_CONFIG.transactions, address, apiKey),
                     fetchData(API_CONFIG.activities, address, apiKey),
-                    fetchData(API_CONFIG.internal, address, apiKey)
+                    fetchData(API_CONFIG.internal, address, apiKey),
+                    processTransactions(address, apiKey)
                 ]);
 
                 const balances = parseTokenData(tokens || {});
-                const txData = processTransactions(tx || {});
                 
                 return {
                     address,
                     MON: balances.MON,
                     aprMON: balances.aprMON,
-                    transactions: txData.total,
+                    transactions: txResult.total,
                     activities: activities?.result?.total || 0,
                     internal: internal?.result?.total || 0,
-                    contracts: txData.contracts
+                    contracts: txResult.contracts
                 };
             } catch (error) {
                 console.error(`地址分析失败: ${address}`, error);
@@ -265,7 +292,7 @@
             }
         }
 
-        // 更新界面和统计信息
+        // 更新界面
         function updateUI(results) {
             const tbody = document.getElementById('resultBody');
             tbody.innerHTML = results.map(result => `
@@ -276,17 +303,16 @@
                     <td class="numeric">${result.transactions}</td>
                     <td class="numeric">${result.activities}</td>
                     <td class="numeric">${result.internal}</td>
+                    <td class="numeric">${result.contracts}</td>
                 </tr>
             `).join('');
 
             // 更新全局统计
             const totalMON = results.reduce((sum, r) => sum + parseFloat(r.MON), 0);
             const totalAprMON = results.reduce((sum, r) => sum + parseFloat(r.aprMON), 0);
-            const totalContracts = results.reduce((sum, r) => sum + r.contracts, 0);
 
             document.getElementById('totalMON').textContent = totalMON.toFixed(4);
             document.getElementById('totalAprMON').textContent = totalAprMON.toFixed(4);
-            document.getElementById('totalContracts').textContent = totalContracts;
         }
 
         // 启动分析
@@ -301,7 +327,7 @@
             if (!addresses.length) return alert('请输入有效的钱包地址');
 
             const tbody = document.getElementById('resultBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">分析中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">分析中...</td></tr>';
 
             try {
                 const results = await Promise.all(
@@ -310,7 +336,7 @@
                 updateUI(results);
             } catch (error) {
                 console.error('分析流程失败:', error);
-                tbody.innerHTML = '<tr><td colspan="6">分析失败: ' + error.message + '</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="7">分析失败: ${error.message}</td></tr>`;
             }
         }
     </script>
