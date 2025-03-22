@@ -64,6 +64,31 @@
             opacity: 0.9;
         }
 
+        .stats-bar {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-label {
+            color: #666;
+        }
+
+        .stat-value {
+            font-family: monospace;
+            color: #2196F3;
+            font-weight: 500;
+        }
+
         .address-table {
             width: 100%;
             border-collapse: collapse;
@@ -110,6 +135,21 @@
         </div>
 
         <textarea id="addresses" placeholder="输入钱包地址，每行一个（示例：0xA6A2e8FbA7d3e34357E3D460aC3B6C460aC8f2）"></textarea>
+
+        <div class="stats-bar" id="globalStats">
+            <div class="stat-item">
+                <span class="stat-label">总 MON:</span>
+                <span class="stat-value" id="totalMON">0.0000</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">总 aprMON:</span>
+                <span class="stat-value" id="totalAprMON">0.0000</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">交互合约数:</span>
+                <span class="stat-value" id="totalContracts">0</span>
+            </div>
+        </div>
 
         <table class="address-table">
             <thead>
@@ -175,6 +215,20 @@
             }
         }
 
+        // 处理交易数据获取合约地址
+        function processTransactions(data) {
+            const contracts = new Set();
+            data?.result?.data?.forEach(tx => {
+                if (tx.toAddress?.address) {
+                    contracts.add(tx.toAddress.address.toLowerCase());
+                }
+            });
+            return {
+                total: data?.result?.total || 0,
+                contracts: contracts.size
+            };
+        }
+
         // 地址分析主函数
         async function analyzeAddress(address, apiKey) {
             try {
@@ -186,14 +240,16 @@
                 ]);
 
                 const balances = parseTokenData(tokens || {});
+                const txData = processTransactions(tx || {});
                 
                 return {
                     address,
                     MON: balances.MON,
                     aprMON: balances.aprMON,
-                    transactions: tx?.result?.total || 0,
+                    transactions: txData.total,
                     activities: activities?.result?.total || 0,
-                    internal: internal?.result?.total || 0
+                    internal: internal?.result?.total || 0,
+                    contracts: txData.contracts
                 };
             } catch (error) {
                 console.error(`地址分析失败: ${address}`, error);
@@ -203,12 +259,13 @@
                     aprMON: '0.0000',
                     transactions: 0,
                     activities: 0,
-                    internal: 0
+                    internal: 0,
+                    contracts: 0
                 };
             }
         }
 
-        // 更新界面
+        // 更新界面和统计信息
         function updateUI(results) {
             const tbody = document.getElementById('resultBody');
             tbody.innerHTML = results.map(result => `
@@ -221,6 +278,15 @@
                     <td class="numeric">${result.internal}</td>
                 </tr>
             `).join('');
+
+            // 更新全局统计
+            const totalMON = results.reduce((sum, r) => sum + parseFloat(r.MON), 0);
+            const totalAprMON = results.reduce((sum, r) => sum + parseFloat(r.aprMON), 0);
+            const totalContracts = results.reduce((sum, r) => sum + r.contracts, 0);
+
+            document.getElementById('totalMON').textContent = totalMON.toFixed(4);
+            document.getElementById('totalAprMON').textContent = totalAprMON.toFixed(4);
+            document.getElementById('totalContracts').textContent = totalContracts;
         }
 
         // 启动分析
