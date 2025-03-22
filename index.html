@@ -105,12 +105,11 @@
         <div class="header">
             <input type="text" 
                    id="apiKey"
-                   placeholder="输入API密钥"
-                   value="2u4VqFS9aYirT71pfdfcOglxVd81">
+                   placeholder="输入API密钥">
             <button onclick="startAnalysis()">开始分析</button>
         </div>
 
-        <textarea id="addresses" placeholder="输入钱包地址，每行一个">0xA6A2e8FbA7d3e34357E3D460aC3B6C460aC8f2</textarea>
+        <textarea id="addresses" placeholder="输入钱包地址，每行一个（示例：0xA6A2e8FbA7d3e34357E3D460aC3B6C460aC8f2）"></textarea>
 
         <table class="address-table">
             <thead>
@@ -121,7 +120,6 @@
                     <th>交易数量</th>
                     <th>活动记录</th>
                     <th>内部交易</th>
-                    <th>交互合约</th>
                 </tr>
             </thead>
             <tbody id="resultBody">
@@ -143,19 +141,29 @@
             return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
         }
 
+        // 代币数据解析
+        function parseTokenData(data) {
+            const MON = data?.result?.data?.find(t => 
+                t.contractAddress === '0x0000000000000000000000000000000000000000')?.balance || '0';
+            const aprMON = data?.result?.data?.find(t => 
+                t.contractAddress === '0xb2f82D0f38dc453D596Ad40A37799446Cc89274A')?.balance || '0';
+            
+            return {
+                MON: Number(MON).toFixed(4),
+                aprMON: Number(aprMON).toFixed(4)
+            }
+        }
+
         // API请求封装
-        async function fetchData(endpoint, address) {
+        async function fetchData(endpoint, address, apiKey) {
             try {
                 const response = await fetch(`${endpoint}?address=${address}`, {
-                    headers: {
-                        'x-api-key': document.getElementById('apiKey').value.trim()
-                    }
+                    headers: { 'x-api-key': apiKey }
                 });
                 
                 if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
                 const data = await response.json();
                 
-                // 检查API业务状态码
                 if (data.code !== 0) {
                     throw new Error(data.message || 'API返回错误');
                 }
@@ -167,44 +175,25 @@
             }
         }
 
-        // 代币余额解析
-        function parseTokenBalance(data, contractAddress) {
-            if (!data?.tokens) return '0.0000';
-            const token = data.tokens.find(t => t.contractAddress === contractAddress);
-            return token ? Number(token.balance).toFixed(4) : '0.0000';
-        }
-
-        // 处理交易数据
-        function processTransactions(data) {
-            return {
-                total: data?.total || 0,
-                contracts: new Set(data?.data?.map(tx => tx.contractAddress)).size || 0
-            };
-        }
-
         // 地址分析主函数
-        async function analyzeAddress(address) {
+        async function analyzeAddress(address, apiKey) {
             try {
                 const [tokens, tx, activities, internal] = await Promise.all([
-                    fetchData(API_CONFIG.tokens, address),
-                    fetchData(API_CONFIG.transactions, address),
-                    fetchData(API_CONFIG.activities, address),
-                    fetchData(API_CONFIG.internal, address)
+                    fetchData(API_CONFIG.tokens, address, apiKey),
+                    fetchData(API_CONFIG.transactions, address, apiKey),
+                    fetchData(API_CONFIG.activities, address, apiKey),
+                    fetchData(API_CONFIG.internal, address, apiKey)
                 ]);
 
-                // 确保所有请求都成功
-                if (!tokens || !tx || !activities || !internal) {
-                    throw new Error('部分请求失败');
-                }
-
+                const balances = parseTokenData(tokens || {});
+                
                 return {
                     address,
-                    MON: parseTokenBalance(tokens, '0x0000000000000000000000000000000000000000'),
-                    aprMON: parseTokenBalance(tokens, '0xb2f82D0f38dc453D596Ad40A37799446Cc89274A'),
-                    transactions: tx.total,
-                    activities: activities.total,
-                    internal: internal.total,
-                    contracts: processTransactions(tx).contracts
+                    MON: balances.MON,
+                    aprMON: balances.aprMON,
+                    transactions: tx?.result?.total || 0,
+                    activities: activities?.result?.total || 0,
+                    internal: internal?.result?.total || 0
                 };
             } catch (error) {
                 console.error(`地址分析失败: ${address}`, error);
@@ -214,8 +203,7 @@
                     aprMON: '0.0000',
                     transactions: 0,
                     activities: 0,
-                    internal: 0,
-                    contracts: 0
+                    internal: 0
                 };
             }
         }
@@ -231,32 +219,32 @@
                     <td class="numeric">${result.transactions}</td>
                     <td class="numeric">${result.activities}</td>
                     <td class="numeric">${result.internal}</td>
-                    <td class="numeric">${result.contracts}</td>
                 </tr>
             `).join('');
         }
 
         // 启动分析
         async function startAnalysis() {
+            const apiKey = document.getElementById('apiKey').value.trim();
             const addresses = document.getElementById('addresses').value
                 .split('\n')
                 .map(a => a.trim())
                 .filter(a => a.startsWith('0x') && a.length === 42);
 
-            if (!addresses.length) {
-                alert('请输入有效的钱包地址');
-                return;
-            }
+            if (!apiKey) return alert('请输入API密钥');
+            if (!addresses.length) return alert('请输入有效的钱包地址');
 
             const tbody = document.getElementById('resultBody');
-            tbody.innerHTML = '<tr><td colspan="7" class="loading">分析中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">分析中...</td></tr>';
 
             try {
-                const results = await Promise.all(addresses.map(analyzeAddress));
+                const results = await Promise.all(
+                    addresses.map(addr => analyzeAddress(addr, apiKey))
+                );
                 updateUI(results);
             } catch (error) {
                 console.error('分析流程失败:', error);
-                tbody.innerHTML = '<tr><td colspan="7">分析失败: ' + error.message + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6">分析失败: ' + error.message + '</td></tr>';
             }
         }
     </script>
