@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>区块链地址分析系统（增强版）</title>
+    <title>Monad钱包交互查询</title>
     <style>
         * {
             box-sizing: border-box;
@@ -140,7 +140,7 @@
 
         <textarea id="addresses" placeholder="输入钱包地址，每行一个"></textarea>
 
-        <button onclick="startAnalysis()" style="width: 100%">开始智能分析</button>
+        <button onclick="startAnalysis()" style="width: 100%">开始查询</button>
 
         <div class="stats-bar" id="globalStats">
             <div class="stat-item">
@@ -156,14 +156,14 @@
         <table class="address-table">
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th>序号</th>
                     <th>地址</th>
                     <th>MON余额</th>
                     <th>aprMON余额</th>
-                    <th>交易数量</th>
-                    <th>活动记录</th>
-                    <th>内部交易</th>
-                    <th>交互合约</th>
+                    <th>Transaction</th>
+                    <th>Activity</th>
+                    <th>Internal Transaction</th>
+                    <th>交互合约数量</th>
                 </tr>
             </thead>
             <tbody id="resultBody"></tbody>
@@ -306,7 +306,7 @@
             if (!addresses.length) return alert('请输入有效的钱包地址');
 
             const tbody = document.getElementById('resultBody');
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">分析中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">查询中...</td></tr>';
 
             try {
                 const THREADS = parseInt(document.getElementById('threads').value);
@@ -336,7 +336,7 @@
                 updateUI(orderedResults);
             } catch (error) {
                 console.error('分析流程失败:', error);
-                tbody.innerHTML = `<tr><td colspan="8">分析失败: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8">查询失败: ${error.message}</td></tr>`;
             }
         }
 
