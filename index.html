@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monad钱包交互查询</title>
+    <title>区块链地址分析系统（顺序修复版）</title>
     <style>
         * {
             box-sizing: border-box;
@@ -140,7 +140,7 @@
 
         <textarea id="addresses" placeholder="输入钱包地址，每行一个"></textarea>
 
-        <button onclick="startAnalysis()" style="width: 100%">开始查询</button>
+        <button onclick="startAnalysis()" style="width: 100%">开始智能分析</button>
 
         <div class="stats-bar" id="globalStats">
             <div class="stat-item">
@@ -156,14 +156,14 @@
         <table class="address-table">
             <thead>
                 <tr>
-                    <th>序号</th>
+                    <th>#</th>
                     <th>地址</th>
                     <th>MON余额</th>
                     <th>aprMON余额</th>
-                    <th>Transaction</th>
-                    <th>Activity</th>
-                    <th>Internal Transaction</th>
-                    <th>交互合约数量</th>
+                    <th>交易数量</th>
+                    <th>活动记录</th>
+                    <th>内部交易</th>
+                    <th>交互合约</th>
                 </tr>
             </thead>
             <tbody id="resultBody"></tbody>
@@ -178,7 +178,6 @@
             internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
         };
 
-        // 强化分页请求
         async function fetchWithRetry(url, options, retries = 3) {
             try {
                 const response = await fetch(url, options);
@@ -199,14 +198,12 @@
             let totalTxCount = 0;
             
             try {
-                // 首次请求获取准确交易总数
                 const firstPage = await fetchWithRetry(
                     `${API_CONFIG.transactions}?address=${address}&limit=1`,
                     { headers: { 'x-api-key': apiKey } }
                 );
                 totalTxCount = firstPage.result?.total || 0;
 
-                // 遍历所有分页数据
                 while (true) {
                     const url = new URL(API_CONFIG.transactions);
                     url.searchParams.set('address', address);
@@ -220,7 +217,6 @@
                     if (data.code !== 0 || !data.result) break;
 
                     data.result.data?.forEach(tx => {
-                        // 双重验证合约地址
                         if (tx.toAddress?.isContract) {
                             contractSet.add(tx.toAddress.address.toLowerCase());
                         }
@@ -233,7 +229,6 @@
                     if (!cursor || cursor === 'null') break;
                 }
 
-                // 获取其他数据
                 const [activities, internal] = await Promise.all([
                     fetchWithRetry(`${API_CONFIG.activities}?address=${address}`, { 
                         headers: { 'x-api-key': apiKey } 
@@ -306,37 +301,30 @@
             if (!addresses.length) return alert('请输入有效的钱包地址');
 
             const tbody = document.getElementById('resultBody');
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">查询中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">分析中...</td></tr>';
 
             try {
                 const THREADS = parseInt(document.getElementById('threads').value);
                 const INTERVAL = parseInt(document.getElementById('interval').value);
-                const results = [];
-                
-                // 分组处理
-                const groups = Array.from({ length: THREADS }, (_, i) => 
-                    addresses.filter((_, index) => index % THREADS === i)
-                );
+                const results = new Array(addresses.length);
+                let currentIndex = 0;
 
-                for (const [index, group] of groups.entries()) {
-                    if (index > 0) {
+                const processAddress = async () => {
+                    while (currentIndex < addresses.length) {
+                        const index = currentIndex++;
+                        const address = addresses[index];
+                        results[index] = await analyzeAddress(address, apiKey);
                         await new Promise(resolve => setTimeout(resolve, INTERVAL));
                     }
-                    const groupResults = await Promise.all(
-                        group.map(addr => analyzeAddress(addr, apiKey))
-                    );
-                    results.push(...groupResults);
-                }
+                };
 
-                // 按原始顺序排序
-                const orderedResults = addresses.map(addr => 
-                    results.find(r => r.address === addr)
-                );
-
-                updateUI(orderedResults);
+                const workers = Array.from({ length: THREADS }, () => processAddress());
+                await Promise.all(workers);
+                
+                updateUI(results);
             } catch (error) {
                 console.error('分析流程失败:', error);
-                tbody.innerHTML = `<tr><td colspan="8">查询失败: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8">分析失败: ${error.message}</td></tr>`;
             }
         }
 
@@ -345,7 +333,7 @@
             tbody.innerHTML = results.map((result, index) => `
                 <tr>
                     <td class="numeric">${index + 1}</td>
-                    <td class="address-short">${shortenAddress(result.address)}</td>
+                    <td class="address-short">${result.address}</td>
                     <td class="numeric">${result.MON}</td>
                     <td class="numeric">${result.aprMON}</td>
                     <td class="numeric">${result.transactions}</td>
