@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>区块链地址分析系统（顺序修复版）</title>
+    <title>区块链地址查询系统（顺序修复版）</title>
     <style>
         * {
             box-sizing: border-box;
@@ -140,7 +140,7 @@
 
         <textarea id="addresses" placeholder="输入钱包地址，每行一个"></textarea>
 
-        <button onclick="startAnalysis()" style="width: 100%">开始智能分析</button>
+        <button onclick="startAnalysis()" style="width: 100%">开始查询</button>
 
         <div class="stats-bar" id="globalStats">
             <div class="stat-item">
@@ -156,7 +156,7 @@
         <table class="address-table">
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th>序号</th>
                     <th>地址</th>
                     <th>MON余额</th>
                     <th>aprMON余额</th>
@@ -277,7 +277,7 @@
                     contracts: txData.contracts
                 };
             } catch (error) {
-                console.error('分析失败:', error);
+                console.error('查询失败:', error);
                 return {
                     address,
                     MON: '0.0000',
@@ -301,7 +301,7 @@
             if (!addresses.length) return alert('请输入有效的钱包地址');
 
             const tbody = document.getElementById('resultBody');
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">分析中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">查询中...</td></tr>';
 
             try {
                 const THREADS = parseInt(document.getElementById('threads').value);
@@ -323,8 +323,8 @@
                 
                 updateUI(results);
             } catch (error) {
-                console.error('分析流程失败:', error);
-                tbody.innerHTML = `<tr><td colspan="8">分析失败: ${error.message}</td></tr>`;
+                console.error('查询流程失败:', error);
+                tbody.innerHTML = `<tr><td colspan="8">查询失败: ${error.message}</td></tr>`;
             }
         }
 
