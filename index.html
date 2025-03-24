@@ -188,53 +188,52 @@
 
         class AddressAnalyzer {
             constructor() {
-                this.jobQueue = []
-                this.currentIndex = 0
-                this.results = []
-                this.total = 0
-                this.interval = 1000
-                this.threads = 3
+                this.jobQueue = [];
+                this.currentIndex = 0;
+                this.results = [];
+                this.total = 0;
+                this.interval = 1000;
+                this.threads = 3;
             }
 
             init(apiKey, addresses, threads, interval) {
-                this.apiKey = apiKey
-                this.threads = threads
-                this.interval = interval
-                this.currentIndex = 0
-                this.results = new Array(addresses.length)
-                this.jobQueue = addresses
-                this.total = addresses.length
+                this.apiKey = apiKey;
+                this.threads = threads;
+                this.interval = interval;
+                this.currentIndex = 0;
+                this.results = new Array(addresses.length);
+                this.jobQueue = addresses;
+                this.total = addresses.length;
             }
 
             async start() {
-                const workers = Array.from({ length: this.threads }, () => this.processQueue())
-                await Promise.all(workers)
+                const workers = Array.from({ length: this.threads }, () => this.processQueue());
+                await Promise.all(workers);
             }
 
             async processQueue() {
                 while (this.currentIndex < this.total) {
-                    const index = this.currentIndex++
-                    const address = this.jobQueue[index]
+                    const index = this.currentIndex++;
+                    const address = this.jobQueue[index];
                     
-                    // 插入行
-                    const row = this.insertLoadingRow(index, address)
+                    const row = this.insertLoadingRow(index, address);
                     
                     try {
-                        const result = await this.analyzeAddress(address)
-                        this.updateResultRow(row, result)
-                        this.results[index] = result
+                        const result = await this.analyzeAddress(address);
+                        this.updateResultRow(row, result);
+                        this.results[index] = result;
                     } catch (error) {
-                        this.showErrorRow(row)
-                        this.results[index] = this.createErrorResult(address)
+                        this.showErrorRow(row);
+                        this.results[index] = this.createErrorResult(address);
                     }
                     
-                    this.updateGlobalStats()
-                    await new Promise(r => setTimeout(r, this.interval))
+                    this.updateGlobalStats();
+                    await new Promise(r => setTimeout(r, this.interval));
                 }
             }
 
             insertLoadingRow(index, address) {
-                const row = document.getElementById('resultBody').insertRow(index)
+                const row = document.getElementById('resultBody').insertRow(index);
                 row.innerHTML = `
                     <td class="numeric">${index + 1}</td>
                     <td class="address-short">${this.shortenAddress(address)}</td>
@@ -244,22 +243,22 @@
                     <td class="numeric loading-status">...</td>
                     <td class="numeric loading-status">...</td>
                     <td class="numeric loading-status">...</td>
-                `
-                return row
+                `;
+                return row;
             }
 
             updateResultRow(row, result) {
-                row.cells[2].textContent = result.MON
-                row.cells[3].textContent = result.aprMON
-                row.cells[4].textContent = result.transactions
-                row.cells[5].textContent = result.activities
-                row.cells[6].textContent = result.internal
-                row.cells[7].textContent = result.contracts
-                Array.from(row.cells).forEach(c => c.classList.remove('loading-status'))
+                row.cells[2].textContent = result.MON;
+                row.cells[3].textContent = result.aprMON;
+                row.cells[4].textContent = result.transactions;
+                row.cells[5].textContent = result.activities;
+                row.cells[6].textContent = result.internal;
+                row.cells[7].textContent = result.contracts;
+                Array.from(row.cells).forEach(c => c.classList.remove('loading-status'));
             }
 
             showErrorRow(row) {
-                row.innerHTML = '<td colspan="8" style="color: #ff4444">请求失败</td>'
+                row.innerHTML = '<td colspan="8" style="color: #ff4444">请求失败</td>';
             }
 
             createErrorResult(address) {
@@ -271,19 +270,19 @@
                     activities: 0,
                     internal: 0,
                     contracts: 0
-                }
+                };
             }
 
             updateGlobalStats() {
-                const validResults = this.results.filter(r => r)
-                const totalMON = validResults.reduce((s, r) => s + parseFloat(r.MON), 0)
-                const totalAprMON = validResults.reduce((s, r) => s + parseFloat(r.aprMON), 0)
-                document.getElementById('totalMON').textContent = totalMON.toFixed(4)
-                document.getElementById('totalAprMON').textContent = totalAprMON.toFixed(4)
+                const validResults = this.results.filter(r => r);
+                const totalMON = validResults.reduce((s, r) => s + parseFloat(r.MON), 0);
+                const totalAprMON = validResults.reduce((s, r) => s + parseFloat(r.aprMON), 0);
+                document.getElementById('totalMON').textContent = totalMON.toFixed(4);
+                document.getElementById('totalAprMON').textContent = totalAprMON.toFixed(4);
             }
 
             shortenAddress(address) {
-                return address ? `${address.slice(0,6)}...${address.slice(-4)}` : ''
+                return address ? `${address.slice(0,6)}...${address.slice(-4)}` : '';
             }
 
             async analyzeAddress(address) {
@@ -291,87 +290,78 @@
                     const [tokens, txData] = await Promise.all([
                         this.fetchAllTokens(address),
                         this.fetchContractsData(address)
-                    ])
-
-                    return this.processData(address, tokens, txData)
+                    ]);
+                    return this.processData(address, tokens, txData);
                 } catch (error) {
-                    console.error('查询失败:', error)
-                    throw error
+                    console.error('查询失败:', error);
+                    throw error;
                 }
             }
 
             async fetchAllTokens(address) {
-                let allTokens = []
-                let cursor = ''
-                let hasNextPage = true
-                let foundAprMON = false
+                let allTokens = [];
+                let cursor = '';
+                let hasNextPage = true;
 
-                while (hasNextPage && !foundAprMON) {
-                    const url = `${API_CONFIG.tokens}?address=${address}&cursor=${cursor}`
-                    const data = await this.fetchWithRetry(url)
+                while (hasNextPage) {
+                    const url = `${API_CONFIG.tokens}?address=${address}&cursor=${cursor}`;
+                    const data = await this.fetchWithRetry(url);
                     
                     if (data?.result?.data) {
-                        allTokens = allTokens.concat(data.result.data)
-                        
-                        // 检查是否找到aprMON
-                        foundAprMON = data.result.data.some(t => 
-                            t.contractAddress?.toLowerCase() === APR_MON_CONTRACT
-                        )
+                        allTokens = allTokens.concat(data.result.data);
                     }
-
-                    // 更新分页游标
-                    cursor = data?.result?.nextPageCursor || ''
-                    hasNextPage = !!cursor
+                    
+                    cursor = data?.result?.nextPageCursor || '';
+                    hasNextPage = !!cursor;
                 }
-
-                return allTokens
+                return allTokens;
             }
 
             async fetchContractsData(address) {
-                let contracts = new Set()
-                let totalTx = 0
-                let cursor = ''
+                let contracts = new Set();
+                let totalTx = 0;
+                let cursor = '';
 
                 const firstPage = await this.fetchWithRetry(
                     `${API_CONFIG.transactions}?address=${address}&limit=1`
-                )
-                totalTx = firstPage.result?.total || 0
+                );
+                totalTx = firstPage.result?.total || 0;
 
                 while (true) {
                     const data = await this.fetchWithRetry(
                         `${API_CONFIG.transactions}?address=${address}&cursor=${cursor}&limit=50`
-                    )
+                    );
                     
                     data.result.data?.forEach(tx => {
-                        tx.toAddress?.isContract && contracts.add(tx.toAddress.address.toLowerCase())
-                        tx.contractAddress && contracts.add(tx.contractAddress.toLowerCase())
-                    })
+                        tx.toAddress?.isContract && contracts.add(tx.toAddress.address.toLowerCase());
+                        tx.contractAddress && contracts.add(tx.contractAddress.toLowerCase());
+                    });
 
-                    cursor = data.result.nextPageCursor
-                    if (!cursor) break
+                    cursor = data.result.nextPageCursor;
+                    if (!cursor) break;
                 }
 
                 const [activities, internal] = await Promise.all([
                     this.fetchWithRetry(`${API_CONFIG.activities}?address=${address}`),
                     this.fetchWithRetry(`${API_CONFIG.internal}?address=${address}`)
-                ])
+                ]);
 
                 return {
                     total: totalTx,
                     contracts: contracts.size,
                     activities: activities.result?.total || 0,
                     internal: internal.result?.total || 0
-                }
+                };
             }
 
             processData(address, tokens, txData) {
                 const MON = tokens.find(t => 
                     t.contractAddress?.toLowerCase() === MON_CONTRACT
-                )?.balance || '0'
+                )?.balance || '0';
 
                 const aprMON = tokens.find(t => 
                     t.contractAddress?.toLowerCase() === APR_MON_CONTRACT
-                )?.balance || '0'
+                )?.balance || '0';
 
                 return {
                     address,
@@ -381,52 +371,52 @@
                     activities: txData.activities,
                     internal: txData.internal,
                     contracts: txData.contracts
-                }
+                };
             }
 
             async fetchWithRetry(url, retries = 3) {
                 try {
                     const response = await fetch(url, {
                         headers: { 'x-api-key': this.apiKey }
-                    })
-                    if (!response.ok) throw new Error(`HTTP错误 ${response.status}`)
-                    return await response.json()
+                    });
+                    if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
+                    return await response.json();
                 } catch (error) {
                     if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 1000))
-                        return this.fetchWithRetry(url, retries - 1)
+                        await new Promise(r => setTimeout(r, 1000));
+                        return this.fetchWithRetry(url, retries - 1);
                     }
-                    throw error
+                    throw error;
                 }
             }
         }
 
         async function startAnalysis() {
-            const apiKey = document.getElementById('apiKey').value.trim()
+            const apiKey = document.getElementById('apiKey').value.trim();
             const addresses = document.getElementById('addresses').value
                 .split('\n')
                 .map(a => a.trim())
-                .filter(a => a.startsWith('0x') && a.length === 42)
+                .filter(a => a.startsWith('0x') && a.length === 42);
 
-            if (!apiKey) return alert('请输入API密钥')
-            if (!addresses.length) return alert('请输入有效的钱包地址')
+            if (!apiKey) return alert('请输入API密钥');
+            if (!addresses.length) return alert('请输入有效的钱包地址');
 
-            document.getElementById('resultBody').innerHTML = ''
-            document.getElementById('totalMON').textContent = '0.0000'
-            document.getElementById('totalAprMON').textContent = '0.0000'
+            document.getElementById('resultBody').innerHTML = '';
+            document.getElementById('totalMON').textContent = '0.0000';
+            document.getElementById('totalAprMON').textContent = '0.0000';
 
-            const analyzer = new AddressAnalyzer()
+            const analyzer = new AddressAnalyzer();
             analyzer.init(
                 apiKey,
                 addresses,
                 parseInt(document.getElementById('threads').value),
                 parseInt(document.getElementById('interval').value)
-            )
+            );
 
             try {
-                await analyzer.start()
+                await analyzer.start();
             } catch (error) {
-                console.error('查询流程失败:', error)
+                console.error('查询流程失败:', error);
             }
         }
     </script>
