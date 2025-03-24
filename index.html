@@ -183,6 +183,8 @@
             internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
         };
 
+        const APR_MON_CONTRACT = '0xb2f82d0f38dc453d596ad40a37799446cc89274a';
+
         class AddressAnalyzer {
             constructor() {
                 this.jobQueue = []
@@ -286,7 +288,7 @@
             async analyzeAddress(address) {
                 try {
                     const [tokens, txData] = await Promise.all([
-                        this.fetchWithRetry(`${API_CONFIG.tokens}?address=${address}`),
+                        this.fetchAllTokens(address),
                         this.fetchContractsData(address)
                     ])
 
@@ -295,6 +297,54 @@
                     console.error('查询失败:', error)
                     throw error
                 }
+            }
+
+            async fetchAllTokens(address) {
+                let allTokens = []
+                let cursor = ''
+                let foundAprMON = false
+
+                while (true) {
+                    const url = `${API_CONFIG.tokens}?address=${address}&cursor=${cursor}`
+                    const data = await this.fetchWithRetry(url)
+                    
+                    if (data?.result?.data) {
+                        allTokens = allTokens.concat(data.result.data)
+                        
+                        // 检查是否找到aprMON
+                        const hasAprMON = data.result.data.some(t => 
+                            t.contractAddress?.toLowerCase() === APR_MON_CONTRACT.toLowerCase()
+                        )
+                        if (hasAprMON) {
+                            foundAprMON = true
+                            break
+                        }
+                    }
+
+                    cursor = data?.result?.nextPageCursor || ''
+                    if (!cursor) break
+                }
+
+                // 如果未找到aprMON但还有数据，继续请求直到找到或没有数据
+                if (!foundAprMON) {
+                    while (cursor) {
+                        const url = `${API_CONFIG.tokens}?address=${address}&cursor=${cursor}`
+                        const data = await this.fetchWithRetry(url)
+                        
+                        if (data?.result?.data) {
+                            allTokens = allTokens.concat(data.result.data)
+                            
+                            const hasAprMON = data.result.data.some(t => 
+                                t.contractAddress?.toLowerCase() === APR_MON_CONTRACT.toLowerCase()
+                            )
+                            if (hasAprMON) break
+                        }
+                        
+                        cursor = data?.result?.nextPageCursor || ''
+                    }
+                }
+
+                return allTokens
             }
 
             async fetchContractsData(address) {
@@ -335,12 +385,12 @@
             }
 
             processData(address, tokens, txData) {
-                const MON = tokens?.result?.data?.find(t => 
+                const MON = tokens?.find(t => 
                     t.contractAddress?.toLowerCase() === '0x0000000000000000000000000000000000000000'
                 )?.balance || '0'
 
-                const aprMON = tokens?.result?.data?.find(t => 
-                    t.contractAddress?.toLowerCase() === '0xb2f82d0f38dc453d596ad40a37799446cc89274a'
+                const aprMON = tokens?.find(t => 
+                    t.contractAddress?.toLowerCase() === APR_MON_CONTRACT.toLowerCase()
                 )?.balance || '0'
 
                 return {
