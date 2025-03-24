@@ -183,7 +183,8 @@
             internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
         };
 
-        const APR_MON_CONTRACT = '0xb2f82d0f38dc453d596ad40a37799446cc89274a';
+        const APR_MON_CONTRACT = '0xb2f82d0f38dc453d596ad40a37799446cc89274a'.toLowerCase();
+        const MON_CONTRACT = '0x0000000000000000000000000000000000000000'.toLowerCase();
 
         class AddressAnalyzer {
             constructor() {
@@ -302,9 +303,10 @@
             async fetchAllTokens(address) {
                 let allTokens = []
                 let cursor = ''
+                let hasNextPage = true
                 let foundAprMON = false
 
-                while (true) {
+                while (hasNextPage && !foundAprMON) {
                     const url = `${API_CONFIG.tokens}?address=${address}&cursor=${cursor}`
                     const data = await this.fetchWithRetry(url)
                     
@@ -312,36 +314,14 @@
                         allTokens = allTokens.concat(data.result.data)
                         
                         // 检查是否找到aprMON
-                        const hasAprMON = data.result.data.some(t => 
-                            t.contractAddress?.toLowerCase() === APR_MON_CONTRACT.toLowerCase()
+                        foundAprMON = data.result.data.some(t => 
+                            t.contractAddress?.toLowerCase() === APR_MON_CONTRACT
                         )
-                        if (hasAprMON) {
-                            foundAprMON = true
-                            break
-                        }
                     }
 
+                    // 更新分页游标
                     cursor = data?.result?.nextPageCursor || ''
-                    if (!cursor) break
-                }
-
-                // 如果未找到aprMON但还有数据，继续请求直到找到或没有数据
-                if (!foundAprMON) {
-                    while (cursor) {
-                        const url = `${API_CONFIG.tokens}?address=${address}&cursor=${cursor}`
-                        const data = await this.fetchWithRetry(url)
-                        
-                        if (data?.result?.data) {
-                            allTokens = allTokens.concat(data.result.data)
-                            
-                            const hasAprMON = data.result.data.some(t => 
-                                t.contractAddress?.toLowerCase() === APR_MON_CONTRACT.toLowerCase()
-                            )
-                            if (hasAprMON) break
-                        }
-                        
-                        cursor = data?.result?.nextPageCursor || ''
-                    }
+                    hasNextPage = !!cursor
                 }
 
                 return allTokens
@@ -385,12 +365,12 @@
             }
 
             processData(address, tokens, txData) {
-                const MON = tokens?.find(t => 
-                    t.contractAddress?.toLowerCase() === '0x0000000000000000000000000000000000000000'
+                const MON = tokens.find(t => 
+                    t.contractAddress?.toLowerCase() === MON_CONTRACT
                 )?.balance || '0'
 
-                const aprMON = tokens?.find(t => 
-                    t.contractAddress?.toLowerCase() === APR_MON_CONTRACT.toLowerCase()
+                const aprMON = tokens.find(t => 
+                    t.contractAddress?.toLowerCase() === APR_MON_CONTRACT
                 )?.balance || '0'
 
                 return {
