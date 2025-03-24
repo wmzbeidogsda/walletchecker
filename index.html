@@ -99,9 +99,14 @@
             font-weight: 500;
         }
 
-        .address-short {
+        .address-short a {
             font-family: monospace;
             color: #2196F3;
+            text-decoration: none;
+        }
+
+        .address-short a:hover {
+            text-decoration: underline;
         }
 
         .numeric {
@@ -236,7 +241,11 @@
                 const row = document.getElementById('resultBody').insertRow(index);
                 row.innerHTML = `
                     <td class="numeric">${index + 1}</td>
-                    <td class="address-short">${this.shortenAddress(address)}</td>
+                    <td class="address-short">
+                        <a href="https://testnet.monadexplorer.com/address/${address}" target="_blank">
+                            ${this.shortenAddress(address)}
+                        </a>
+                    </td>
                     <td class="numeric loading-status">...</td>
                     <td class="numeric loading-status">...</td>
                     <td class="numeric loading-status">...</td>
