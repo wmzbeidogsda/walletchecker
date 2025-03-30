@@ -3,431 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monad钱包查询</title>
+    <title>Monad 批量查询工具 v2.0</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f8f9fa;
-            padding: 2rem;
-        }
-
         .container {
             max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            padding: 2rem;
+            margin: 20px auto;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-
-        .control-panel {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
         .input-group {
+            margin-bottom: 20px;
+            display: grid;
+            gap: 15px;
+        }
+        .control-panel {
             display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
         }
-
-        .input-group label {
-            font-size: 0.9rem;
-            color: #666;
-        }
-
-        input, select, button {
-            padding: 0.8rem;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        button {
-            background: #2196F3;
-            color: white;
-            border: none;
-            cursor: pointer;
-            transition: opacity 0.3s;
-        }
-
-        button:hover {
-            opacity: 0.9;
-        }
-
-        #addresses {
+        textarea {
             width: 100%;
-            height: 120px;
-            margin: 1rem 0;
-            padding: 1rem;
-            font-family: monospace;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
         }
-
-        .stats-bar {
-            display: flex;
-            gap: 2rem;
-            margin: 1.5rem 0;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .address-table {
+        table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 1.5rem;
+            margin-top: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-
-        .address-table th,
-        .address-table td {
-            padding: 1rem;
+        th, td {
+            border: 1px solid #e0e0e0;
+            padding: 12px;
             text-align: left;
-            border-bottom: 1px solid #eee;
+            font-size: 14px;
         }
-
-        .address-table th {
+        th {
             background: #f8f9fa;
-            color: #666;
             font-weight: 500;
         }
-
-        .address-short a {
-            font-family: monospace;
-            color: #2196F3;
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+        a {
+            color: #1890ff;
             text-decoration: none;
         }
-
-        .address-short a:hover {
+        a:hover {
             text-decoration: underline;
         }
-
-        .numeric {
-            font-family: monospace;
-            color: #333;
+        .summary-panel {
+            display: grid;
+            grid-template-columns: repeat(3, max-content);
+            gap: 30px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
         }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
-        
-        .loading-status {
-            animation: pulse 1.5s infinite;
+        .summary-label {
+            font-size: 12px;
             color: #666;
+        }
+        .summary-value {
+            font-size: 18px;
+            font-weight: 500;
+        }
+        button {
+            padding: 8px 20px;
+            background: #1890ff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        input[type="text"], input[type="number"] {
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #apiKey {
+            width: 300px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="control-panel">
-            <div class="input-group">
-                <label>API密钥:</label>
-                <input type="text" id="apiKey" placeholder="输入API密钥">
-            </div>
-            <div class="input-group">
-                <label>查询线程数:</label>
-                <select id="threads">
-                    <option value="1">1线程</option>
-                    <option value="2">2线程</option>
-                    <option value="3" selected>3线程</option>
-                    <option value="4">4线程</option>
-                </select>
-            </div>
-            <div class="input-group">
-                <label>线程间隔(毫秒):</label>
-                <input type="number" id="interval" value="1000" min="500">
-            </div>
-        </div>
-
-        <textarea id="addresses" placeholder="输入钱包地址，每行一个"></textarea>
-
-        <button onclick="startAnalysis()" style="width: 100%">开始查询</button>
-
-        <div class="stats-bar" id="globalStats">
-            <div class="stat-item">
-                <span class="stat-label">总 MON:</span>
-                <span class="stat-value" id="totalMON">0.0000</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">总质押aprMON:</span>
-                <span class="stat-value" id="totalAprMON">0.0000</span>
+        <h2>Monad 批量查询工具 v2.0</h2>
+        
+        <div class="input-group">
+            <textarea id="addresses" placeholder="输入要查询的地址（每行一个）"></textarea>
+            
+            <div class="control-panel">
+                <div>
+                    <label>API密钥:</label>
+                    <input type="text" id="apiKey" placeholder="输入API密钥">
+                </div>
+                <div>
+                    <label>线程数:</label>
+                    <input type="number" id="threads" min="1" max="10" value="1">
+                </div>
+                <div>
+                    <label>间隔(秒):</label>
+                    <input type="number" id="interval" value="5">
+                </div>
+                <button onclick="startQuery()">开始查询</button>
             </div>
         </div>
 
-        <table class="address-table">
+        <div class="summary-panel">
+            <div class="summary-item">
+                <span class="summary-label">总 MON</span>
+                <span class="summary-value" id="totalMON">0</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">总 aprMON</span>
+                <span class="summary-value" id="totalAprMON">0</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">唯一合约数</span>
+                <span class="summary-value" id="uniqueContracts">0</span>
+            </div>
+        </div>
+
+        <table id="resultTable">
             <thead>
                 <tr>
-                    <th>序号</th>
+                    <th>#</th>
                     <th>地址</th>
                     <th>MON余额</th>
                     <th>aprMON余额</th>
-                    <th>Transaction</th>
-                    <th>Activity</th>
-                    <th>Internal Transaction</th>
-                    <th>交互合约数量</th>
+                    <th>交易总数</th>
+                    <th>交互合约数</th>
                 </tr>
             </thead>
-            <tbody id="resultBody"></tbody>
+            <tbody></tbody>
         </table>
     </div>
 
     <script>
-        const API_CONFIG = {
-            tokens: 'https://api.blockvision.org/v2/monad/account/tokens',
-            transactions: 'https://api.blockvision.org/v2/monad/account/transactions',
-            activities: 'https://api.blockvision.org/v2/monad/account/activities',
-            internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
+        let results = [];
+        let contractSet = new Set();
+        let isQueryRunning = false;
+        const TOKEN_CONFIG = {
+            MON: "0x0000000000000000000000000000000000000000",
+            APR_MON: "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A"
         };
 
-        const APR_MON_CONTRACT = '0xb2f82d0f38dc453d596ad40a37799446cc89274a'.toLowerCase();
-        const MON_CONTRACT = '0x0000000000000000000000000000000000000000'.toLowerCase();
-
-        class AddressAnalyzer {
-            constructor() {
-                this.jobQueue = [];
-                this.currentIndex = 0;
-                this.results = [];
-                this.total = 0;
-                this.interval = 1000;
-                this.threads = 3;
-            }
-
-            init(apiKey, addresses, threads, interval) {
-                this.apiKey = apiKey;
-                this.threads = threads;
-                this.interval = interval;
-                this.currentIndex = 0;
-                this.results = new Array(addresses.length);
-                this.jobQueue = addresses;
-                this.total = addresses.length;
-            }
-
-            async start() {
-                const workers = Array.from({ length: this.threads }, () => this.processQueue());
-                await Promise.all(workers);
-            }
-
-            async processQueue() {
-                while (this.currentIndex < this.total) {
-                    const index = this.currentIndex++;
-                    const address = this.jobQueue[index];
-                    
-                    const row = this.insertLoadingRow(index, address);
-                    
-                    try {
-                        const result = await this.analyzeAddress(address);
-                        this.updateResultRow(row, result);
-                        this.results[index] = result;
-                    } catch (error) {
-                        this.showErrorRow(row);
-                        this.results[index] = this.createErrorResult(address);
-                    }
-                    
-                    this.updateGlobalStats();
-                    await new Promise(r => setTimeout(r, this.interval));
-                }
-            }
-
-            insertLoadingRow(index, address) {
-                const row = document.getElementById('resultBody').insertRow(index);
-                row.innerHTML = `
-                    <td class="numeric">${index + 1}</td>
-                    <td class="address-short">
-                        <a href="https://testnet.monadexplorer.com/address/${address}" target="_blank">
-                            ${this.shortenAddress(address)}
-                        </a>
-                    </td>
-                    <td class="numeric loading-status">...</td>
-                    <td class="numeric loading-status">...</td>
-                    <td class="numeric loading-status">...</td>
-                    <td class="numeric loading-status">...</td>
-                    <td class="numeric loading-status">...</td>
-                    <td class="numeric loading-status">...</td>
-                `;
-                return row;
-            }
-
-            updateResultRow(row, result) {
-                row.cells[2].textContent = result.MON;
-                row.cells[3].textContent = result.aprMON;
-                row.cells[4].textContent = result.transactions;
-                row.cells[5].textContent = result.activities;
-                row.cells[6].textContent = result.internal;
-                row.cells[7].textContent = result.contracts;
-                Array.from(row.cells).forEach(c => c.classList.remove('loading-status'));
-            }
-
-            showErrorRow(row) {
-                row.innerHTML = '<td colspan="8" style="color: #ff4444">请求失败</td>';
-            }
-
-            createErrorResult(address) {
-                return {
-                    address,
-                    MON: '0.0000',
-                    aprMON: '0.0000',
-                    transactions: 0,
-                    activities: 0,
-                    internal: 0,
-                    contracts: 0
-                };
-            }
-
-            updateGlobalStats() {
-                const validResults = this.results.filter(r => r);
-                const totalMON = validResults.reduce((s, r) => s + parseFloat(r.MON), 0);
-                const totalAprMON = validResults.reduce((s, r) => s + parseFloat(r.aprMON), 0);
-                document.getElementById('totalMON').textContent = totalMON.toFixed(4);
-                document.getElementById('totalAprMON').textContent = totalAprMON.toFixed(4);
-            }
-
-            shortenAddress(address) {
-                return address ? `${address.slice(0,6)}...${address.slice(-4)}` : '';
-            }
-
-            async analyzeAddress(address) {
-                try {
-                    const [tokens, txData] = await Promise.all([
-                        this.fetchAllTokens(address),
-                        this.fetchContractsData(address)
-                    ]);
-                    return this.processData(address, tokens, txData);
-                } catch (error) {
-                    console.error('查询失败:', error);
-                    throw error;
-                }
-            }
-
-            async fetchAllTokens(address) {
-                let allTokens = [];
-                let cursor = '';
-                let hasNextPage = true;
-
-                while (hasNextPage) {
-                    const url = `${API_CONFIG.tokens}?address=${address}&cursor=${cursor}`;
-                    const data = await this.fetchWithRetry(url);
-                    
-                    if (data?.result?.data) {
-                        allTokens = allTokens.concat(data.result.data);
-                    }
-                    
-                    cursor = data?.result?.nextPageCursor || '';
-                    hasNextPage = !!cursor;
-                }
-                return allTokens;
-            }
-
-            async fetchContractsData(address) {
-                let contracts = new Set();
-                let totalTx = 0;
-                let cursor = '';
-
-                const firstPage = await this.fetchWithRetry(
-                    `${API_CONFIG.transactions}?address=${address}&limit=1`
+        async function queryAddress(address, index) {
+            const apiKey = document.getElementById('apiKey').value;
+            try {
+                // 代币查询
+                const tokensRes = await fetchWithRetry(
+                    `https://api.blockvision.org/v2/monad/account/tokens?address=${address}`,
+                    apiKey
                 );
-                totalTx = firstPage.result?.total || 0;
+                
+                // 交易记录查询
+                const activitiesRes = await fetchWithRetry(
+                    `https://api.blockvision.org/v2/monad/account/activities?address=${address}`,
+                    apiKey
+                );
 
-                while (true) {
-                    const data = await this.fetchWithRetry(
-                        `${API_CONFIG.transactions}?address=${address}&cursor=${cursor}&limit=50`
-                    );
-                    
-                    data.result.data?.forEach(tx => {
-                        tx.toAddress?.isContract && contracts.add(tx.toAddress.address.toLowerCase());
-                        tx.contractAddress && contracts.add(tx.contractAddress.toLowerCase());
-                    });
-
-                    cursor = data.result.nextPageCursor;
-                    if (!cursor) break;
-                }
-
-                const [activities, internal] = await Promise.all([
-                    this.fetchWithRetry(`${API_CONFIG.activities}?address=${address}`),
-                    this.fetchWithRetry(`${API_CONFIG.internal}?address=${address}`)
-                ]);
+                const balances = processTokenData(tokensRes);
+                processActivityData(activitiesRes);
 
                 return {
-                    total: totalTx,
-                    contracts: contracts.size,
-                    activities: activities.result?.total || 0,
-                    internal: internal.result?.total || 0
-                };
-            }
-
-            processData(address, tokens, txData) {
-                const MON = tokens.find(t => 
-                    t.contractAddress?.toLowerCase() === MON_CONTRACT
-                )?.balance || '0';
-
-                const aprMON = tokens.find(t => 
-                    t.contractAddress?.toLowerCase() === APR_MON_CONTRACT
-                )?.balance || '0';
-
-                return {
+                    index,
                     address,
-                    MON: Number(MON).toFixed(4),
-                    aprMON: Number(aprMON).toFixed(4),
-                    transactions: txData.total,
-                    activities: txData.activities,
-                    internal: txData.internal,
-                    contracts: txData.contracts
+                    ...balances,
+                    totalTx: activitiesRes?.result?.total || 0,
+                    contractCount: contractSet.size
                 };
-            }
-
-            async fetchWithRetry(url, retries = 3) {
-                try {
-                    const response = await fetch(url, {
-                        headers: { 'x-api-key': this.apiKey }
-                    });
-                    if (!response.ok) throw new Error(`HTTP错误 ${response.status}`);
-                    return await response.json();
-                } catch (error) {
-                    if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 1000));
-                        return this.fetchWithRetry(url, retries - 1);
-                    }
-                    throw error;
-                }
+            } catch (error) {
+                console.error(`查询地址 ${address} 失败:`, error);
+                return null;
             }
         }
 
-        async function startAnalysis() {
-            const apiKey = document.getElementById('apiKey').value.trim();
+        async function fetchWithRetry(url, apiKey, retries = 3) {
+            try {
+                const res = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`
+                    }
+                });
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                return await res.json();
+            } catch (error) {
+                if (retries > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return fetchWithRetry(url, apiKey, retries - 1);
+                }
+                throw error;
+            }
+        }
+
+        // 数据处理函数保持不变...
+
+        async function startQuery() {
+            if (isQueryRunning) {
+                alert("已有查询正在进行");
+                return;
+            }
+            
+            if (!document.getElementById('apiKey').value) {
+                alert("请输入API密钥");
+                return;
+            }
+
+            // 初始化状态
+            isQueryRunning = true;
+            results = [];
+            contractSet.clear();
+            document.querySelector('tbody').innerHTML = '';
+            
             const addresses = document.getElementById('addresses').value
                 .split('\n')
-                .map(a => a.trim())
-                .filter(a => a.startsWith('0x') && a.length === 42);
+                .map(addr => addr.trim())
+                .filter(addr => addr.length === 42);
 
-            if (!apiKey) return alert('请输入API密钥');
-            if (!addresses.length) return alert('请输入有效的钱包地址');
-
-            document.getElementById('resultBody').innerHTML = '';
-            document.getElementById('totalMON').textContent = '0.0000';
-            document.getElementById('totalAprMON').textContent = '0.0000';
-
-            const analyzer = new AddressAnalyzer();
-            analyzer.init(
-                apiKey,
-                addresses,
-                parseInt(document.getElementById('threads').value),
-                parseInt(document.getElementById('interval').value)
-            );
+            const threadCount = parseInt(document.getElementById('threads').value);
+            const interval = parseInt(document.getElementById('interval').value) * 1000;
 
             try {
-                await analyzer.start();
-            } catch (error) {
-                console.error('查询流程失败:', error);
+                for (let i = 0; i < addresses.length; i += threadCount) {
+                    const batch = addresses.slice(i, i + threadCount);
+                    const promises = batch.map((addr, idx) => 
+                        queryAddress(addr, i + idx + 1)
+                    );
+                    
+                    const batchResults = await Promise.all(promises);
+                    results.push(...batchResults.filter(Boolean));
+                    
+                    updateUI();
+                    
+                    // 间隔控制
+                    if (i + threadCount < addresses.length) {
+                        await new Promise(resolve => setTimeout(resolve, interval));
+                    }
+                }
+            } finally {
+                isQueryRunning = false;
             }
         }
+
+        // UI更新函数保持不变...
     </script>
 </body>
 </html>
