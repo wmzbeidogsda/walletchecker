@@ -3,106 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monad 批量查询工具 v3.0</title>
+    <title>Monad 批量查询工具 v4.0</title>
     <style>
-        .container {
-            max-width: 1200px;
-            margin: 20px auto;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        .input-group {
-            margin-bottom: 20px;
-            display: grid;
-            gap: 15px;
-        }
-        .control-panel {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-        textarea {
-            width: 100%;
-            height: 150px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            resize: vertical;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        th, td {
-            border: 1px solid #e0e0e0;
-            padding: 12px;
-            text-align: left;
-            font-size: 14px;
-        }
-        th {
-            background: #f8f9fa;
-            font-weight: 500;
-        }
-        tr:nth-child(even) {
-            background-color: #fafafa;
-        }
-        a {
-            color: #1890ff;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        .stats-panel {
-            display: flex;
-            gap: 30px;
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 4px;
-        }
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: #666;
-        }
-        .stat-value {
-            font-size: 18px;
-            font-weight: 500;
-        }
-        button {
-            padding: 8px 20px;
-            background: #1890ff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background: #40a9ff;
-        }
-        input[type="text"], input[type="number"] {
-            padding: 6px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        #apiKey {
-            width: 280px;
-        }
+        /* 保持原有样式不变 */
+        .container { max-width: 1200px; margin: 20px auto; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .input-group { margin-bottom: 20px; display: grid; gap: 15px; }
+        .control-panel { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
+        textarea { width: 100%; height: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #e0e0e0; padding: 12px; text-align: left; font-size: 14px; }
+        th { background: #f8f9fa; font-weight: 500; }
+        tr:nth-child(even) { background-color: #fafafa; }
+        a { color: #1890ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .stats-panel { display: grid; grid-template-columns: repeat(3, max-content); gap: 30px; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px; }
+        .stat-item { display: flex; flex-direction: column; gap: 5px; }
+        .stat-label { font-size: 12px; color: #666; }
+        .stat-value { font-size: 18px; font-weight: 500; }
+        button { padding: 8px 20px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background 0.3s; }
+        button:hover { background: #40a9ff; }
+        input[type="text"], input[type="number"] { padding: 6px; border: 1px solid #ddd; border-radius: 4px; }
+        #apiKey { width: 280px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Monad 批量查询工具 v3.0</h2>
+        <h2>Monad 批量查询工具 v4.0</h2>
         
         <div class="input-group">
             <textarea id="addresses" placeholder="输入要查询的地址（每行一个）"></textarea>
@@ -156,37 +82,66 @@
 
     <script>
         let results = [];
-        let contractSet = new Set();
         let isQueryRunning = false;
         const TOKEN_CONFIG = {
             MON: "0x0000000000000000000000000000000000000000",
             APR_MON: "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A"
         };
 
-        async function queryAddress(address, index) {
+        // 地址脱敏处理
+        function formatAddress(address) {
+            return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
+        }
+
+        async function queryAddress(originalAddress, index) {
             const apiKey = document.getElementById('apiKey').value;
+            const address = originalAddress.toLowerCase();
+            const contracts = new Set();
+
             try {
-                // 代币查询
+                // 查询代币余额
                 const tokensRes = await fetchWithRetry(
                     `https://api.blockvision.org/v2/monad/account/tokens?address=${address}`,
                     apiKey
                 );
                 
-                // 交易记录查询
-                const activitiesRes = await fetchWithRetry(
-                    `https://api.blockvision.org/v2/monad/account/activities?address=${address}`,
+                // 查询普通交易
+                const txRes = await fetchWithRetry(
+                    `https://api.blockvision.org/v2/monad/account/txs?address=${address}`,
                     apiKey
                 );
 
-                const balances = processTokenData(tokensRes);
-                processActivityData(activitiesRes);
+                // 查询内部交易
+                const internalTxRes = await fetchWithRetry(
+                    `https://api.blockvision.org/v2/monad/account/internal-txs?address=${address}`,
+                    apiKey
+                );
+
+                // 处理合约地址
+                [...txRes?.result?.data, ...internalTxRes?.result?.data].forEach(tx => {
+                    if (tx.to) contracts.add(tx.to.toLowerCase());
+                    if (tx.from) contracts.add(tx.from.toLowerCase());
+                });
+
+                // 处理代币数据
+                let monBalance = 0, aprmonBalance = 0;
+                tokensRes?.result?.data?.forEach(token => {
+                    const addr = token.contractAddress?.toLowerCase();
+                    if (addr === TOKEN_CONFIG.MON.toLowerCase()) {
+                        monBalance = parseFloat(token.balance);
+                    } else if (addr === TOKEN_CONFIG.APR_MON.toLowerCase()) {
+                        aprmonBalance = parseFloat(token.balance);
+                    }
+                });
 
                 return {
                     index,
-                    address,
-                    ...balances,
-                    totalTx: activitiesRes?.result?.total || 0,
-                    contractCount: contractSet.size
+                    originalAddress,
+                    formattedAddress: formatAddress(address),
+                    monBalance,
+                    aprmonBalance,
+                    totalTx: (txRes?.result?.total || 0) + (internalTxRes?.result?.total || 0),
+                    contractCount: contracts.size
                 };
             } catch (error) {
                 console.error(`查询地址 ${address} 失败:`, error);
@@ -197,9 +152,7 @@
         async function fetchWithRetry(url, apiKey, retries = 3) {
             try {
                 const res = await fetch(url, {
-                    headers: {
-                        'x-api-key': apiKey  // 关键修改点
-                    }
+                    headers: { 'x-api-key': apiKey }
                 });
                 
                 if (!res.ok) {
@@ -216,30 +169,6 @@
             }
         }
 
-        function processTokenData(response) {
-            let monBalance = 0;
-            let aprmonBalance = 0;
-            
-            response?.result?.data?.forEach(token => {
-                const addr = token.contractAddress?.toLowerCase();
-                if (addr === TOKEN_CONFIG.MON.toLowerCase()) {
-                    monBalance = parseFloat(token.balance);
-                } else if (addr === TOKEN_CONFIG.APR_MON.toLowerCase()) {
-                    aprmonBalance = parseFloat(token.balance);
-                }
-            });
-            
-            return { monBalance, aprmonBalance };
-        }
-
-        function processActivityData(response) {
-            response?.result?.data?.forEach(tx => {
-                if (tx.transactionAddress) {
-                    contractSet.add(tx.transactionAddress.toLowerCase());
-                }
-            });
-        }
-
         async function startQuery() {
             if (isQueryRunning) {
                 alert("已有查询正在进行");
@@ -253,7 +182,6 @@
 
             isQueryRunning = true;
             results = [];
-            contractSet.clear();
             document.querySelector('tbody').innerHTML = '';
             
             const addresses = document.getElementById('addresses').value
@@ -286,18 +214,13 @@
         }
 
         function updateUI() {
-            updateTable();
-            updateStats();
-        }
-
-        function updateTable() {
             const tbody = document.querySelector('tbody');
             tbody.innerHTML = results.map(item => `
                 <tr>
                     <td>${item.index}</td>
                     <td>
-                        <a href="https://testnet.monadexplorer.com/address/${item.address}" 
-                           target="_blank">${item.address}</a>
+                        <a href="https://testnet.monadexplorer.com/address/${item.originalAddress}" 
+                           target="_blank">${item.formattedAddress}</a>
                     </td>
                     <td>${item.monBalance.toFixed(4)}</td>
                     <td>${item.aprmonBalance.toFixed(4)}</td>
@@ -305,15 +228,15 @@
                     <td>${item.contractCount}</td>
                 </tr>
             `).join('');
-        }
 
-        function updateStats() {
+            // 更新统计
             const totalMON = results.reduce((sum, item) => sum + item.monBalance, 0);
             const totalAprMON = results.reduce((sum, item) => sum + item.aprmonBalance, 0);
+            const uniqueContracts = new Set(results.flatMap(item => item.contractAddresses)).size;
             
             document.getElementById('totalMON').textContent = totalMON.toFixed(4);
             document.getElementById('totalAprMON').textContent = totalAprMON.toFixed(4);
-            document.getElementById('uniqueContracts').textContent = contractSet.size;
+            document.getElementById('uniqueContracts').textContent = uniqueContracts;
         }
     </script>
 </body>
