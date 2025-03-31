@@ -917,37 +917,37 @@
                 return allTokens;
             }
 
-            async checkSoulNFT(address) {
-                let hasSoulNFT = false;
-                let cursor = '';
-                let hasNextPage = true;
+async checkSoulNFT(address) {
+    let hasSoulNFT = false;
+    let cursor = '';
+    let hasNextPage = true;
 
-                while (hasNextPage && !hasSoulNFT) {
-                    const url = `${API_CONFIG.nfts}?address=${address}&cursor=${cursor}&limit=50`;
-                    const data = await this.fetchWithRetry(url);
-                    
-                    if (data?.result?.data) {
-                        // 检查items数组中的contractAddress
-                        hasSoulNFT = data.result.data.some(nft => {
-                            // 检查主合约地址
-                            if (nft.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT) {
-                                return true;
-                            }
-                            // 检查items数组中的合约地址
-                            if (nft.items && Array.isArray(nft.items)) {
-                                return nft.items.some(item => 
-                                    item.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
-                                );
-                            }
-                            return false;
-                        });
-                    }
-                    
-                    cursor = data?.result?.nextPageCursor || '';
-                    hasNextPage = !!cursor;
+    while (hasNextPage && !hasSoulNFT) {
+        const url = `${API_CONFIG.nfts}?address=${address}&cursor=${cursor}&limit=50`;
+        const data = await this.fetchWithRetry(url);
+        
+        if (data?.result?.data) {
+            // 深度检查NFT数据中的contractAddress
+            hasSoulNFT = data.result.data.some(nft => {
+                // 检查主合约地址
+                if (nft.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT) {
+                    return true;
                 }
-                return hasSoulNFT;
-            }
+                // 检查items数组中的合约地址
+                if (nft.items && Array.isArray(nft.items)) {
+                    return nft.items.some(item => 
+                        item.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
+                    );
+                }
+                return false;
+            });
+        }
+        
+        cursor = data?.result?.nextPageCursor || '';
+        hasNextPage = !!cursor;
+    }
+    return hasSoulNFT;
+}
 
             async fetchContractsData(address) {
                 let contracts = new Set();
