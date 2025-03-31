@@ -927,9 +927,20 @@
                     const data = await this.fetchWithRetry(url);
                     
                     if (data?.result?.data) {
-                        hasSoulNFT = data.result.data.some(nft => 
-                            nft.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
-                        );
+                        // 检查items数组中的contractAddress
+                        hasSoulNFT = data.result.data.some(nft => {
+                            // 检查主合约地址
+                            if (nft.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT) {
+                                return true;
+                            }
+                            // 检查items数组中的合约地址
+                            if (nft.items && Array.isArray(nft.items)) {
+                                return nft.items.some(item => 
+                                    item.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
+                                );
+                            }
+                            return false;
+                        });
                     }
                     
                     cursor = data?.result?.nextPageCursor || '';
