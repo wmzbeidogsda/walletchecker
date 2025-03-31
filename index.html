@@ -767,8 +767,7 @@
             transactions: 'https://api.blockvision.org/v2/monad/account/transactions',
             activities: 'https://api.blockvision.org/v2/monad/account/activities',
             internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions',
-            hasSoulNFT: 'https://api.blockvision.org/v2/monad/account/nfts'
-
+            nfts: 'https://api.blockvision.org/v2/monad/account/nfts'
         };
 
         const APR_MON_CONTRACT = '0xb2f82d0f38dc453d596ad40a37799446cc89274a'.toLowerCase();
@@ -887,11 +886,12 @@
 
             async analyzeAddress(address) {
                 try {
-                    const [tokens, txData] = await Promise.all([
+                    const [tokens, txData, hasSoulNFT] = await Promise.all([
                         this.fetchAllTokens(address),
-                        this.fetchContractsData(address)
+                        this.fetchContractsData(address),
+                        this.checkSoulNFT(address)
                     ]);
-                    return this.processData(address, tokens, txData);
+                    return this.processData(address, tokens, txData, hasSoulNFT);
                 } catch (error) {
                     console.error('查询失败:', error);
                     throw error;
@@ -917,11 +917,31 @@
                 return allTokens;
             }
 
+            async checkSoulNFT(address) {
+                let hasSoulNFT = false;
+                let cursor = '';
+                let hasNextPage = true;
+
+                while (hasNextPage && !hasSoulNFT) {
+                    const url = `${API_CONFIG.nfts}?address=${address}&cursor=${cursor}&limit=50`;
+                    const data = await this.fetchWithRetry(url);
+                    
+                    if (data?.result?.data) {
+                        hasSoulNFT = data.result.data.some(nft => 
+                            nft.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
+                        );
+                    }
+                    
+                    cursor = data?.result?.nextPageCursor || '';
+                    hasNextPage = !!cursor;
+                }
+                return hasSoulNFT;
+            }
+
             async fetchContractsData(address) {
                 let contracts = new Set();
                 let totalTx = 0;
                 let cursor = '';
-                let hasSoulNFT = false;
 
                 // 获取交易总数
                 const firstPage = await this.fetchWithRetry(
@@ -958,22 +978,15 @@
                 );
                 const totalInternal = internal.result?.total || 0;
 
-                // 检查是否持有灵魂NFT
-                const tokens = await this.fetchAllTokens(address);
-                hasSoulNFT = tokens.some(t => 
-                    t.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
-                );
-
                 return {
                     total: totalTx,
                     contracts: contracts.size,
                     activities: totalActivities,
-                    internal: totalInternal,
-                    hasSoulNFT
+                    internal: totalInternal
                 };
             }
 
-            processData(address, tokens, txData) {
+            processData(address, tokens, txData, hasSoulNFT) {
                 const MON = tokens.find(t => 
                     t.contractAddress?.toLowerCase() === MON_CONTRACT
                 )?.balance || '0';
@@ -989,7 +1002,7 @@
                     transactions: txData.total,
                     activities: txData.activities,
                     internal: txData.internal,
-                    hasSoulNFT: txData.hasSoulNFT,
+                    hasSoulNFT,
                     contracts: txData.contracts
                 };
             }
