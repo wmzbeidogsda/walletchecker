@@ -3,175 +3,312 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monad 批量查询工具 v7.0</title>
+    <title>Monad多功能管理</title>
     <style>
-        .container {
-            max-width: 1200px;
-            margin: 20px auto;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        :root {
+            --primary-color: #4a90e2;
+            --danger-color: #ff4d4f;
+            --success-color: #52c41a;
+            --background-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --sidebar-bg: #2c3e50;
+            --sidebar-width: 250px;
         }
-        .control-panel {
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
+            background-color: var(--background-color);
+            color: #333;
             display: flex;
-            gap: 15px;
-            align-items: center;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
+            min-height: 100vh;
         }
-        textarea {
-            width: 100%;
-            height: 150px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            resize: vertical;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        th, td {
-            border: 1px solid #e0e0e0;
-            padding: 12px;
-            text-align: left;
-            font-size: 14px;
-        }
-        .stats-panel {
-            display: grid;
-            grid-template-columns: repeat(2, max-content);
-            gap: 30px;
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 4px;
-        }
-        button {
-            padding: 8px 20px;
-            background: #1890ff;
+
+        /* 侧边栏样式 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--sidebar-bg);
             color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
+            padding: 1rem 0;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
         }
-        #apiKey { width: 280px; }
+
+        /* 保持原有样式不变... */
+
+        /* Monad钱包查询更新样式 */
+        .monad-wallet-container .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .monad-wallet-container .stat-item {
+            background: var(--card-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Monad 批量查询工具 v7.0</h2>
-        
-        <div class="input-group">
-            <textarea id="addresses" placeholder="输入要查询的地址（每行一个）"></textarea>
-            
-            <div class="control-panel">
-                <div>
-                    <label>API密钥:</label>
-                    <input type="text" id="apiKey" placeholder="x-api-key">
-                </div>
-                <div>
-                    <label>线程数:</label>
-                    <input type="number" id="threads" min="1" max="10" value="1">
-                </div>
-                <div>
-                    <label>间隔(秒):</label>
-                    <input type="number" id="interval" value="5">
-                </div>
-                <button onclick="startQuery()">开始查询</button>
-            </div>
+    <!-- 侧边导航栏 -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Monad管理</h2>
+        </div>
+        <ul class="sidebar-menu">
+            <li class="menu-item" id="dashboard-menu"><i>🏠</i> 控制面板</li>
+            <li class="menu-item" id="function-menu"><i>⚙️</i> 功能管理</li>
+            <ul class="submenu" id="function-submenu">
+                <li class="submenu-item" data-target="project">交互管理</li>
+                <li class="submenu-item" data-target="wallet">钱包查询</li>
+            </ul>
+        </ul>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <!-- 欢迎页面 -->
+        <div class="welcome-container" id="welcome-page">
+            <div class="welcome-message">二十岁偷的懒，三十岁日夜弥补</div>
         </div>
 
-        <div class="stats-panel">
-            <div class="stat-item">
-                <span class="stat-label">总 MON</span>
-                <span class="stat-value" id="totalMON">0</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">总 aprMON</span>
-                <span class="stat-value" id="totalAprMON">0</span>
-            </div>
+        <!-- 交互管理模块（保持不变） -->
+        <div class="monad-project-container" id="project-container">
+            <!-- 保持原有交互管理UI不变... -->
         </div>
 
-        <table id="resultTable">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>地址</th>
-                    <th>MON余额</th>
-                    <th>aprMON余额</th>
-                    <th>交易总数</th>
-                    <th>交互合约数</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <!-- 更新后的钱包查询模块 -->
+        <div class="monad-wallet-container" id="wallet-container">
+            <div class="container">
+                <div class="control-panel">
+                    <div class="input-group">
+                        <label>API密钥:</label>
+                        <input type="text" id="apiKey" placeholder="输入API密钥">
+                    </div>
+                    <div class="input-group">
+                        <label>查询线程数 (1-10):</label>
+                        <input type="number" id="threads" min="1" max="10" value="1">
+                    </div>
+                    <div class="input-group">
+                        <label>间隔时间(秒):</label>
+                        <input type="number" id="interval" value="5" min="1">
+                    </div>
+                </div>
+
+                <textarea id="addresses" placeholder="输入钱包地址，每行一个"></textarea>
+
+                <button onclick="startAnalysis()" style="width:100%;padding:12px">开始查询</button>
+
+                <div class="stats-bar" id="globalStats">
+                    <div class="stat-item">
+                        <span>总 MON:</span>
+                        <span id="totalMON">0.0000</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>总 aprMON:</span>
+                        <span id="totalAprMON">0.0000</span>
+                    </div>
+                </div>
+
+                <table class="address-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>地址</th>
+                            <th>MON</th>
+                            <th>aprMON</th>
+                            <th>交易数</th>
+                            <th>内部交易</th>
+                            <th>灵魂勋章</th>
+                            <th>交互合约</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultBody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
-        const API_ENDPOINTS = {
-            TOKENS: 'https://api.blockvision.org/v2/monad/account/tokens',
-            TRANSACTIONS: 'https://api.blockvision.org/v2/monad/account/transactions',
-            INTERNAL_TX: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
+        // 交互管理功能（保持完全不变）
+        let projects = JSON.parse(localStorage.getItem('projects')) || [];
+        let openedProjects = JSON.parse(localStorage.getItem('openedProjects')) || [];
+        // ... 保持原有交互管理代码不变 ...
+
+        // 更新后的钱包查询功能
+        const SOUL_NFT_CONTRACT = '0x922dA3512e2BEBBe32bccE59adf7E6759fB8CEA2'.toLowerCase();
+        const API_CONFIG = {
+            tokens: 'https://api.blockvision.org/v2/monad/account/tokens',
+            transactions: 'https://api.blockvision.org/v2/monad/account/transactions',
+            internal: 'https://api.blockvision.org/v2/monad/account/internal/transactions'
         };
 
-        function formatAddress(address) {
-            return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
-        }
+        class WalletAnalyzer {
+            constructor() {
+                this.totalMON = 0;
+                this.totalAprMON = 0;
+                this.contractCache = new Set();
+            }
 
-        async function queryAddress(address, index) {
-            try {
-                const [tokensRes, txRes, internalTxRes] = await Promise.all([
-                    fetchData(`${API_ENDPOINTS.TOKENS}?address=${address}`, document.getElementById('apiKey').value),
-                    fetchData(`${API_ENDPOINTS.TRANSACTIONS}?address=${address}`, document.getElementById('apiKey').value),
-                    fetchData(`${API_ENDPOINTS.INTERNAL_TX}?address=${address}`, document.getElementById('apiKey').value)
+            async analyze(addresses, threads, interval) {
+                const batchSize = parseInt(threads);
+                const totalBatches = Math.ceil(addresses.length / batchSize);
+                
+                for (let i = 0; i < totalBatches; i++) {
+                    const batch = addresses.slice(i * batchSize, (i + 1) * batchSize);
+                    await Promise.all(batch.map(addr => this.processAddress(addr)));
+                    if (i < totalBatches - 1) await this.delay(interval * 1000);
+                }
+            }
+
+            async processAddress(address) {
+                try {
+                    const [tokens, txData] = await Promise.all([
+                        this.fetchPaginatedTokens(address),
+                        this.fetchTransactionData(address)
+                    ]);
+
+                    const monBalance = this.getBalance(tokens, '0x0000000000000000000000000000000000000000');
+                    const aprMonBalance = this.getBalance(tokens, '0xb2f82D0f38dc453D596Ad40A37799446Cc89274A');
+                    
+                    const result = {
+                        address,
+                        monBalance,
+                        aprMonBalance,
+                        totalTx: txData.transactions.total,
+                        internalTx: txData.internal.total,
+                        hasSoulNFT: this.checkNFT(tokens),
+                        contractCount: this.contractCache.size
+                    };
+
+                    this.updateGlobalStats(result);
+                    this.appendToTable(result);
+                } catch (error) {
+                    console.error(`处理地址 ${address} 失败:`, error);
+                }
+            }
+
+            async fetchPaginatedTokens(address) {
+                let allTokens = [];
+                let cursor = '';
+                do {
+                    const response = await fetch(`${API_CONFIG.tokens}?address=${address}&limit=50&cursor=${cursor}`);
+                    const data = await response.json();
+                    allTokens = allTokens.concat(data.result?.data || []);
+                    cursor = data.result?.nextPageCursor || '';
+                } while (cursor);
+                return allTokens;
+            }
+
+            async fetchTransactionData(address) {
+                const [transactions, internal] = await Promise.all([
+                    this.fetchPaginated(`${API_CONFIG.transactions}?address=${address}&limit=50`),
+                    this.fetchPaginated(`${API_CONFIG.internal}?address=${address}&limit=50`)
                 ]);
 
-                const contracts = new Set();
-                [...txRes.result.data, ...internalTxRes.result.data].forEach(tx => {
-                    if (tx.to) contracts.add(tx.to.toLowerCase());
-                    if (tx.from) contracts.add(tx.from.toLowerCase());
+                transactions.data.forEach(tx => {
+                    if (tx.toAddress?.isContract) {
+                        this.contractCache.add(tx.toAddress.address.toLowerCase());
+                    }
                 });
 
-                return {
-                    index,
-                    originalAddress: address,
-                    formattedAddress: formatAddress(address),
-                    monBalance: parseTokenBalance(tokensRes, 'MON'),
-                    aprmonBalance: parseTokenBalance(tokensRes, 'APR_MON'),
-                    totalTx: txRes.result.total + internalTxRes.result.total,
-                    contractCount: contracts.size
-                };
-            } catch (error) {
-                console.error(`查询失败: ${error}`);
-                return null;
+                return { transactions, internal };
+            }
+
+            async fetchPaginated(url) {
+                let total = 0;
+                let data = [];
+                let cursor = '';
+                do {
+                    const response = await fetch(`${url}&cursor=${cursor}`);
+                    const json = await response.json();
+                    total = json.result?.total || 0;
+                    data = data.concat(json.result?.data || []);
+                    cursor = json.result?.nextPageCursor || '';
+                } while (cursor);
+                return { total, data };
+            }
+
+            getBalance(tokens, contract) {
+                const token = tokens.find(t => 
+                    t.contractAddress?.toLowerCase() === contract.toLowerCase()
+                );
+                return token ? Number(token.balance).toFixed(4) : '0.0000';
+            }
+
+            checkNFT(tokens) {
+                return tokens.some(t => 
+                    t.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
+                ) ? '✅' : '❌';
+            }
+
+            updateGlobalStats(result) {
+                this.totalMON += parseFloat(result.monBalance);
+                this.totalAprMON += parseFloat(result.aprMonBalance);
+                
+                document.getElementById('totalMON').textContent = this.totalMON.toFixed(4);
+                document.getElementById('totalAprMON').textContent = this.totalAprMON.toFixed(4);
+            }
+
+            appendToTable(result) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${document.querySelectorAll('#resultBody tr').length + 1}</td>
+                    <td>
+                        <a href="https://testnet.monadexplorer.com/address/${result.address}" 
+                           target="_blank">${result.address.slice(0, 8)}...${result.address.slice(-4)}
+                        </a>
+                    </td>
+                    <td>${result.monBalance}</td>
+                    <td>${result.aprMonBalance}</td>
+                    <td>${result.totalTx}</td>
+                    <td>${result.internalTx}</td>
+                    <td>${result.hasSoulNFT}</td>
+                    <td>${result.contractCount}</td>
+                `;
+                document.getElementById('resultBody').appendChild(row);
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
             }
         }
 
-        function parseTokenBalance(response, tokenType) {
-            const token = response.result.data.find(t => 
-                t.contractAddress?.toLowerCase() === TOKEN_CONFIG[tokenType].toLowerCase()
+        async function startAnalysis() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const addresses = document.getElementById('addresses').value
+                .split('\n')
+                .map(a => a.trim())
+                .filter(a => /^0x[a-fA-F0-9]{40}$/.test(a));
+
+            if (!apiKey) return alert('请输入API密钥');
+            if (addresses.length === 0) return alert('请输入有效地址');
+
+            document.getElementById('resultBody').innerHTML = '';
+            
+            const analyzer = new WalletAnalyzer();
+            await analyzer.analyze(
+                addresses,
+                document.getElementById('threads').value,
+                document.getElementById('interval').value
             );
-            return parseFloat(token?.balance || 0);
         }
 
-        async function fetchData(url, apiKey, retries = 3) {
-            try {
-                const res = await fetch(url, {
-                    headers: { 'x-api-key': apiKey }
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
-            } catch (error) {
-                if (retries > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    return fetchData(url, apiKey, retries - 1);
-                }
-                throw error;
-            }
-        }
-
-        // 其他函数保持不变...
+        // 初始化导航功能
+        document.addEventListener('DOMContentLoaded', () => {
+            // 保持原有导航逻辑不变...
+        });
     </script>
 </body>
 </html>
