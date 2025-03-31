@@ -920,15 +920,20 @@
 async checkSoulNFT(address) {
     try {
         const url = `${API_CONFIG.nfts}?address=${address}`;
-        const data = await this.fetchWithRetry(url);
+        const response = await this.fetchWithRetry(url);
         
-        if (!data || !data.data) return false;
+        // 检查响应结构和数据
+        if (!response || !response.result || !response.result.data) {
+            console.error('无效的API响应结构', response);
+            return false;
+        }
         
-        // 直接检查整个响应数据中是否存在灵魂勋章合约
-        const hasSoulNFT = data.data.some(collection => 
+        // 检查所有NFT集合中是否有灵魂勋章
+        const hasSoulNFT = response.result.data.some(collection => 
             collection.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT.toLowerCase()
         );
         
+        console.log('灵魂勋章检查结果:', hasSoulNFT, '数据:', response.result.data);
         return hasSoulNFT;
     } catch (error) {
         console.error('检查灵魂勋章NFT出错:', error);
