@@ -918,37 +918,23 @@
             }
 
 async checkSoulNFT(address) {
-    let hasSoulNFT = false;
-    let cursor = '';
-    let hasNextPage = true;
-
-    while (hasNextPage && !hasSoulNFT) {
-        const url = `${API_CONFIG.nfts}?address=${address}&cursor=${cursor}&limit=50`;
+    try {
+        const url = `${API_CONFIG.nfts}?address=${address}`;
         const data = await this.fetchWithRetry(url);
         
-        if (data?.data) {  // 注意这里改为检查data字段而不是result.data
-            // 检查每个NFT集合
-            hasSoulNFT = data.data.some(nftCollection => {
-                // 检查集合合约地址
-                if (nftCollection.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT) {
-                    return true;
-                }
-                // 检查items数组中的合约地址
-                if (nftCollection.items && Array.isArray(nftCollection.items)) {
-                    return nftCollection.items.some(item => 
-                        item.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
-                    );
-                }
-                return false;
-            });
-        }
+        if (!data || !data.data) return false;
         
-        cursor = data?.cursor || '';  // 注意这里改为获取cursor字段
-        hasNextPage = !!cursor;
+        // 直接检查整个响应数据中是否存在灵魂勋章合约
+        const hasSoulNFT = data.data.some(collection => 
+            collection.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT.toLowerCase()
+        );
+        
+        return hasSoulNFT;
+    } catch (error) {
+        console.error('检查灵魂勋章NFT出错:', error);
+        return false;
     }
-    return hasSoulNFT;
 }
-
             async fetchContractsData(address) {
                 let contracts = new Set();
                 let totalTx = 0;
