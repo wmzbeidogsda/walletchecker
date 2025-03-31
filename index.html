@@ -772,7 +772,8 @@
 
         const APR_MON_CONTRACT = '0xb2f82d0f38dc453d596ad40a37799446cc89274a'.toLowerCase();
         const MON_CONTRACT = '0x0000000000000000000000000000000000000000'.toLowerCase();
-        const SOUL_NFT_CONTRACT = '0x922da3512e2bbebbe32bcce59adf7e6759fb8cea2'.toLowerCase();
+        const SOUL_NFT_CONTRACT = '0x922da3512e2bbebbe32bcce59adf7e6759fb8cea2';
+        const SOUL_NFT_NAME = '1 Million Nads';
 
         class AddressAnalyzer {
             constructor() {
@@ -918,40 +919,40 @@ updateResultRow(row, result) {
                 return allTokens;
             }
 
-async checkSoulNFT(address) {
-    try {
-        const url = `${API_CONFIG.nfts}?address=${address}`;
-        const response = await this.fetchWithRetry(url);
-        
-        console.log('NFT API响应:', response); // 调试日志
-        
-        if (!response?.result?.data) {
-            console.error('API响应结构异常');
-            return false;
-        }
+            async checkSoulNFT(address) {
+                try {
+                    const url = `${API_CONFIG.nfts}?address=${address}`;
+                    const response = await this.fetchWithRetry(url);
+                    
+                    console.log('NFT API完整响应:', JSON.stringify(response, null, 2)); // 调试用
+                    
+                    if (!response?.result?.data) {
+                        console.error('API返回数据格式不正确');
+                        return false;
+                    }
 
         // 深度检查所有可能的合约地址位置
-        const hasSoulNFT = response.result.data.some(collection => {
-            // 检查主合约地址
-            if (collection.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT) {
-                return true;
-            }
-            // 检查items数组中的合约地址
-            if (collection.items) {
-                return collection.items.some(item => 
-                    item.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
-                );
-            }
-            return false;
-        });
+                        const hasSoulNFT = response.result.data.some(collection => {
+                        const isCorrectContract = collection.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT.toLowerCase();
+                        const isCorrectName = collection.name === SOUL_NFT_NAME;
+                        
+                        console.log('检查NFT:', {
+                            name: collection.name,
+                            contract: collection.contractAddress,
+                            isCorrectContract,
+                            isCorrectName
+                        });
+                        
+                        return isCorrectContract && isCorrectName;
+                    });
 
-        console.log('灵魂勋章检查结果:', hasSoulNFT);
-        return hasSoulNFT;
-    } catch (error) {
-        console.error('检查灵魂勋章出错:', error);
-        return false;
-    }
-}
+                    console.log('最终灵魂勋章检查结果:', hasSoulNFT);
+                    return hasSoulNFT;
+                } catch (error) {
+                    console.error('检查灵魂勋章NFT出错:', error);
+                    return false;
+                }
+            }
             async fetchContractsData(address) {
                 let contracts = new Set();
                 let totalTx = 0;
