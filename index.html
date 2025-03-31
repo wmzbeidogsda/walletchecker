@@ -926,16 +926,16 @@ async checkSoulNFT(address) {
         const url = `${API_CONFIG.nfts}?address=${address}&cursor=${cursor}&limit=50`;
         const data = await this.fetchWithRetry(url);
         
-        if (data?.result?.data) {
-            // 深度检查NFT数据中的contractAddress
-            hasSoulNFT = data.result.data.some(nft => {
-                // 检查主合约地址
-                if (nft.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT) {
+        if (data?.data) {  // 注意这里改为检查data字段而不是result.data
+            // 检查每个NFT集合
+            hasSoulNFT = data.data.some(nftCollection => {
+                // 检查集合合约地址
+                if (nftCollection.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT) {
                     return true;
                 }
                 // 检查items数组中的合约地址
-                if (nft.items && Array.isArray(nft.items)) {
-                    return nft.items.some(item => 
+                if (nftCollection.items && Array.isArray(nftCollection.items)) {
+                    return nftCollection.items.some(item => 
                         item.contractAddress?.toLowerCase() === SOUL_NFT_CONTRACT
                     );
                 }
@@ -943,7 +943,7 @@ async checkSoulNFT(address) {
             });
         }
         
-        cursor = data?.result?.nextPageCursor || '';
+        cursor = data?.cursor || '';  // 注意这里改为获取cursor字段
         hasNextPage = !!cursor;
     }
     return hasSoulNFT;
